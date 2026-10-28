@@ -8,6 +8,8 @@ interface Props {
   people: Person[];
   stats: Map<string, Involvement>;
   onOpen: (id: string) => void;
+  /** Opens your own page. */
+  onOpenMe?: () => void;
   /** You, in the center: your name and photo, if you have set them. */
   me?: { name: string; photo: string | null };
 }
@@ -15,7 +17,7 @@ interface Props {
 const ZERO: Involvement = { points: 0, level: 0, acts: 0, last: null };
 
 /** The home page: you in the middle, everyone else placed by how involved you have been with them. */
-export default function MapView({ people, stats, onOpen, me }: Props) {
+export default function MapView({ people, stats, onOpen, onOpenMe, me }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 600 });
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -98,7 +100,14 @@ export default function MapView({ people, stats, onOpen, me }: Props) {
         })}
 
         <g transform={`translate(${cx} ${cy})`}>
-          <g className="pop">
+          <g
+            className="pop me-node"
+            role="button"
+            tabIndex={0}
+            aria-label="Open your own page"
+            onClick={onOpenMe}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpenMe?.())}
+          >
             <circle r={ME_R} cy={ME_R * 0.12} fill="#7d8bff" opacity="0.22" filter="url(#blur)" />
             <circle r={ME_R} fill="url(#body-me)" />
             {me?.photo && (

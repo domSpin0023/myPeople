@@ -14,6 +14,7 @@ interface PersonRow {
   place: PersonPlace | null;
   birthday: string | null;
   photo: string | null;
+  is_self: boolean;
   created_at: string;
 }
 
@@ -55,6 +56,7 @@ export async function loadAll(): Promise<{ people: Person[]; items: Item[]; prof
     place: r.place ?? null,
     birthday: r.birthday ?? null,
     photo: r.photo ?? null,
+    isSelf: !!r.is_self,
     createdAt: Date.parse(r.created_at),
   }));
   const items: Item[] = ((i.data ?? []) as ItemRow[]).map((r) => ({
@@ -115,6 +117,7 @@ export async function upsertPerson(p: Person): Promise<void> {
       place: p.place ?? null,
       birthday: p.birthday ?? null,
       photo: p.photo ?? null,
+      is_self: !!p.isSelf,
       created_at: new Date(p.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     });

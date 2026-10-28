@@ -11,6 +11,9 @@ interface Props {
   person: Person;
   /** Only this person's items. */
   items: Item[];
+  /** This is your own page: no relationship, involvement or removing. */
+  isSelf?: boolean;
+  onAccount?: () => void;
   onUpdate: (patch: Partial<Person>) => void;
   onDelete: () => void;
   onBack: () => void;
@@ -400,7 +403,7 @@ export function PlaceEditor({
   );
 }
 
-export default function PersonPage({ person, items, onUpdate, onDelete, onBack, onAddItem, onUpdateItem, onDeleteItem }: Props) {
+export default function PersonPage({ person, items, isSelf, onAccount, onUpdate, onDelete, onBack, onAddItem, onUpdateItem, onDeleteItem }: Props) {
   const stat = involvement(items, Date.now());
   const hue = HUES[person.hue];
 
@@ -410,14 +413,20 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
         <button className="pill-btn glass" onClick={onBack}>
           ← Map
         </button>
-        <button
-          className="pill-btn quiet"
-          onClick={() => {
-            if (window.confirm(`Remove ${person.name || "this person"} and everything on their page?`)) onDelete();
-          }}
-        >
-          Remove
-        </button>
+        {isSelf ? (
+          <button className="pill-btn quiet" onClick={onAccount}>
+            Photo &amp; account settings
+          </button>
+        ) : (
+          <button
+            className="pill-btn quiet"
+            onClick={() => {
+              if (window.confirm(`Remove ${person.name || "this person"} and everything on their page?`)) onDelete();
+            }}
+          >
+            Remove
+          </button>
+        )}
       </div>
 
       <section className="hero glass">
@@ -436,11 +445,15 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
             onBlur={() => !person.name.trim() && onUpdate({ name: "Unnamed" })}
           />
           <div className="hero-row">
-            <select value={person.relationship} aria-label="Relationship" onChange={(e) => onUpdate({ relationship: e.target.value })}>
-              {RELATIONSHIPS.map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
+            {isSelf ? (
+              <span className="chip neutral">You</span>
+            ) : (
+              <select value={person.relationship} aria-label="Relationship" onChange={(e) => onUpdate({ relationship: e.target.value })}>
+                {RELATIONSHIPS.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            )}
             <div className="hues" role="group" aria-label="Color">
               {HUE_KEYS.map((k) => (
                 <button
@@ -463,6 +476,7 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
             )}
           </div>
         </div>
+        {!isSelf && (
         <div className="involve">
           <Ring level={stat.level} hue={person.hue} />
           <div className="involve-text">
@@ -474,6 +488,7 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
             <span>{stat.last ? `Last: ${fmt(stat.last)}` : "Nothing realized yet"}</span>
           </div>
         </div>
+        )}
       </section>
 
       <div className="lists">
@@ -490,8 +505,9 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
         ))}
       </div>
 
-      <PlaceEditor place={person.place} onChange={(place) => onUpdate({ place })} />
+      <PlaceEditor place={person.place} title={isSelf ? "Where you live" : undefined} onChange={(place) => onUpdate({ place })} />
 
+      {!isSelf && (
       <section className="notes glass">
         <h3>Notes about {person.name || "them"}</h3>
         <textarea
@@ -501,6 +517,7 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
           onChange={(e) => onUpdate({ notes: e.target.value })}
         />
       </section>
+      )}
     </div>
   );
 }

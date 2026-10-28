@@ -70,6 +70,8 @@ export interface Person {
   birthday?: string | null;
   /** A small thumbnail as a data URL. */
   photo?: string | null;
+  /** True for the one entry that is you: it holds your own lists and is never shown as a person. */
+  isSelf?: boolean;
 }
 
 /** How the signed-in person describes themselves. One per account. */

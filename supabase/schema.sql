@@ -28,6 +28,9 @@ create table if not exists public.people (
 -- For a database created before birthday and photo existed (safe to run again):
 alter table public.people add column if not exists birthday text;
 alter table public.people add column if not exists photo text;
+-- your own page (your likes, gifts and so on) is stored as one special person, hidden from the map and the world
+alter table public.people add column if not exists is_self boolean not null default false;
+create unique index if not exists people_one_self_per_user on public.people (user_id) where is_self;
 alter table public.people drop constraint if exists people_birthday_format;
 alter table public.people add constraint people_birthday_format
   check (birthday is null or birthday ~ '^(\d{4}-|--)\d{2}-\d{2}$');

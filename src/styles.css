@@ -444,3 +444,7 @@ textarea { width: 100%; resize: vertical; }
 .bub.fav .bub-face::after { background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.8) 50%, transparent 65%); animation: glint 3.2s ease-in-out infinite; }
 .bub.fav.sel .bub-face { box-shadow: 0 0 0 3px #fff, 0 0 0 8px rgba(190, 150, 255, 0.55), 0 14px 36px rgba(190, 150, 255, 0.6); }
 @media (prefers-reduced-motion: reduce) { .item.fav, .bub.fav .bub-face, .size-opt.fav, .step.fav { animation: none; } .item.fav::after, .step.fav::after, .size-opt.fav::after, .bub.fav .bub-face::after { animation: none; opacity: 0.4; } }
+.me-node { cursor: pointer; }
+.me-node:hover circle:nth-of-type(2), .me-node:focus-visible circle:nth-of-type(2) { filter: brightness(1.06); }
+.me-node:focus-visible { outline: none; }
+.me-node:focus-visible circle:last-of-type { stroke: #fff; stroke-opacity: 1; stroke-width: 3; }

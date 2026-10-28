@@ -20,12 +20,13 @@ const WorldView = lazy(() => import("./WorldView"));
 
 type View = "map" | "world";
 type Section = "profile" | "security" | "data";
-type Route = { kind: View } | { kind: "person"; id: string } | { kind: "account"; section: Section | null };
+type Route = { kind: View } | { kind: "me" } | { kind: "person"; id: string } | { kind: "account"; section: Section | null };
 
 const parseRoute = (): Route => {
   const h = window.location.hash;
   const m = h.match(/^#\/p\/(.+)$/);
   if (m) return { kind: "person", id: decodeURIComponent(m[1]) };
+  if (h === "#/me") return { kind: "me" };
   const a = h.match(/^#\/account(?:\/(profile|security|data))?$/);
   if (a) return { kind: "account", section: (a[1] as Section | undefined) ?? null };
   return { kind: h === "#/world" ? "world" : "map" };
@@ -263,9 +264,38 @@ export default function App({
     sync.remove(`item:${cur.personId}:${id}`, () => db.deleteItem(id));
   };
 
-  const person = route.kind === "person" ? people.find((p) => p.id === route.id) : undefined;
+  // You are stored as one special person holding your own lists; it never appears as someone on the map.
+  const selfPerson = people.find((p) => p.isSelf);
+  const others = useMemo(() => people.filter((p) => !p.isSelf), [people]);
+  const onMe = route.kind === "me";
+  useEffect(() => {
+    if (!onMe || peopleRef.current.some((p) => p.isSelf)) return;
+    const me: Person = { id: crypto.randomUUID(), name: myName, relationship: "Me", hue: profileRef.current.hue, notes: "", createdAt: Date.now(), isSelf: true };
+    commitPeople([...peopleRef.current, me]);
+    saveP(me);
+    // runs when you first open your page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onMe]);
+  const mePage: Person | undefined = selfPerson && {
+    ...selfPerson,
+    name: myName,
+    hue: profile.hue,
+    photo: profile.photo,
+    birthday: profile.birthday,
+    place: profile.place,
+  };
+  const updateMe = (patch: Partial<Person>) => {
+    const p: Partial<Profile> = {};
+    if (patch.name !== undefined) p.displayName = patch.name;
+    if (patch.hue !== undefined) p.hue = patch.hue;
+    if (patch.photo !== undefined) p.photo = patch.photo;
+    if (patch.birthday !== undefined) p.birthday = patch.birthday;
+    if (patch.place !== undefined) p.place = patch.place;
+    if (Object.keys(p).length) updateProfile(p);
+  };
+  const person = route.kind === "person" ? others.find((p) => p.id === route.id) : undefined;
   const onAccount = route.kind === "account";
-  const view: View | "person" | "account" = onAccount ? "account" : person ? "person" : route.kind === "world" ? "world" : "map";
+  const view: View | "person" | "account" = onAccount ? "account" : person || onMe ? "person" : route.kind === "world" ? "world" : "map";
   const openAccount = (section: Section | null) => {
     window.location.hash = section ? `/account/${section}` : "/account";
   };
@@ -291,13 +321,13 @@ export default function App({
               Import contacts
             </button>
           )}
-          {view !== "person" && view !== "account" && <AddPerson nextHue={HUE_KEYS[people.length % HUE_KEYS.length]} onAdd={addPerson} />}
+          {view !== "person" && view !== "account" && <AddPerson nextHue={HUE_KEYS[others.length % HUE_KEYS.length]} onAdd={addPerson} />}
           <AccountMenu account={account} profile={profile} name={myName} onOpen={openAccount} />
         </div>
       </header>
 
       <main className="content">
-        <ErrorBoundary key={view + (person?.id ?? "")}>
+        <ErrorBoundary key={view + (person?.id ?? (onMe ? "me" : ""))}>
         {route.kind === "account" ? (
           <AccountPage
             account={account}
@@ -309,6 +339,22 @@ export default function App({
             onChange={updateProfile}
             onBack={back}
           />
+        ) : onMe ? (
+          mePage ? (
+            <PersonPage
+              key="me"
+              person={mePage}
+              isSelf
+              items={items.filter((i) => i.personId === mePage.id)}
+              onUpdate={updateMe}
+              onDelete={() => undefined}
+              onAccount={() => openAccount("profile")}
+              onBack={back}
+              onAddItem={(list, title) => addItem(mePage.id, list, title)}
+              onUpdateItem={updateItem}
+              onDeleteItem={deleteItem}
+            />
+          ) : null
         ) : person ? (
           <PersonPage
             key={person.id}
@@ -323,17 +369,17 @@ export default function App({
           />
         ) : view === "world" ? (
           <Suspense fallback={<div className="world-loading">Loading the map…</div>}>
-            <WorldView people={people} onOpen={open} />
+            <WorldView people={others} onOpen={open} />
           </Suspense>
         ) : (
-          <MapView people={people} stats={stats} onOpen={open} me={{ name: myName, photo: profile.photo }} />
+          <MapView people={others} stats={stats} onOpen={open} onOpenMe={() => (window.location.hash = "/me")} me={{ name: myName, photo: profile.photo }} />
         )}
         </ErrorBoundary>
       </main>
 
       {importing && (
         <ImportContacts
-          existing={new Set(people.map((p) => norm(p.name)))}
+          existing={new Set(others.map((p) => norm(p.name)))}
           canUseGoogle={account.canUseGoogle}
           resumeGoogle={importing.resume}
           onImport={importPeople}

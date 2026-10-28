@@ -9,6 +9,7 @@
 - `docs/IDEAS.md`, a backlog of ideas not being built yet: myPlaces, a super-powered Life360, and role models (first example: Mike Rowe).
 
 ### Added (lists and likes)
+- **Your own page:** click the "you" bubble in the center of the map to open it. It has the same four lists (your loves, gift ideas, events, ways to serve) and shows your name, color, birthday and where you live from your profile. It stores your lists as one special hidden entry (`people.is_self`, one per account; migration applied and in `supabase/schema.sql`) that never appears on the map, World view or contact import.
 - **List cards show the top four items by importance** (ties: newest first), with a count and **See more**. Rows lift on hover and are **selectable**; only when selected do **-** and **+** appear to change importance. The row holds its place until released, then slides to its new position.
 - **Expanded list view:** a full-screen blob with every item as a floating bubble that keeps a buffer from its neighbours, drifts gently to the middle, can be dragged, and can be focused (one at a time) to choose **Small, Medium, Large or Favorite**. Importance is saved and works for all four lists.
 - **Favorite**, a fourth importance level, with a holographic shimmering look on list rows, bubbles and its buttons. Database: `items.weight` now allows 1 to 4 (migration applied; `supabase/schema.sql` updated). Favorites score like Large (3 points).
