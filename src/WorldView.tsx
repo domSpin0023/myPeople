@@ -9,7 +9,7 @@ import type { Person } from "./types";
 import { HUES } from "./types";
 import { blankStyle } from "./mapStyle";
 import type { Cluster, DisplayLevel } from "./worldLayout";
-import { clusterPeople, levelForZoom, nextZoom } from "./worldLayout";
+import { Z_RING, clusterPeople, levelForZoom, nextZoom, separationZoom } from "./worldLayout";
 
 // In dev MapLibre finds its worker beside its own module; a production bundle needs it pointed out.
 if (import.meta.env.PROD) maplibregl.setWorkerUrl(workerUrl);
@@ -107,6 +107,7 @@ export default function WorldView({ people, onOpen }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [level, setLevel] = useState<DisplayLevel>("country");
+  const [zoom, setZoom] = useState(1.6);
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const fitted = useRef(false);
 
@@ -137,7 +138,10 @@ export default function WorldView({ people, onOpen }: Props) {
     }
     m.touchZoomRotate.disableRotation();
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-    const onZoom = () => setLevel(levelForZoom(m.getZoom()));
+    const onZoom = () => {
+      setLevel(levelForZoom(m.getZoom()));
+      setZoom(Math.round(m.getZoom() * 20) / 20);
+    };
     m.on("zoom", onZoom);
     onZoom();
 
@@ -174,7 +178,7 @@ export default function WorldView({ people, onOpen }: Props) {
 
   const zoomInto = (c: Cluster) => {
     if (!map) return;
-    const min = nextZoom[level];
+    const min = level === "ring" ? Math.min(19, (splitAt.get(c.id) ?? nextZoom[level]) + 0.05) : nextZoom[level];
     const cam = map.cameraForBounds([[c.bounds[0], c.bounds[1]], [c.bounds[2], c.bounds[3]]], { padding: 140, maxZoom: min + 1 });
     map.easeTo({ center: cam?.center ?? [c.lng, c.lat], zoom: Math.max(cam?.zoom ?? min, min + 0.05), duration: 900 });
   };
@@ -186,8 +190,13 @@ export default function WorldView({ people, onOpen }: Props) {
     map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 140, maxZoom: 5, duration: 900 });
   };
 
-  // At street level, anyone with an exact address stands at their real house.
-  const atHouse = level === "house" ? located.filter((p) => p.place!.precision === "address") : [];
+  // Anyone with an exact address stands at their real house as soon as the city comes into view (not only at street level),
+  // so their face is always near where you are looking.
+  const inCity = level === "house" || level === "ring";
+  const splitAt = useMemo(() => new Map(clusters.map((c) => [c.id, separationZoom(c.members)])), [clusters]);
+  const atHouse = inCity
+    ? clusters.flatMap((c) => (zoom >= (splitAt.get(c.id) ?? Z_RING) ? c.members.filter((p) => p.place!.precision === "address") : []))
+    : [];
   const houseIds = new Set(atHouse.map((p) => p.id));
 
   return (
@@ -209,7 +218,7 @@ export default function WorldView({ people, onOpen }: Props) {
       {map &&
         (level === "ring" || level === "house") &&
         clusters.map((c) => {
-          const around = level === "house" ? c.members.filter((m) => !houseIds.has(m.id)) : c.members;
+          const around = c.members.filter((m) => !houseIds.has(m.id));
           if (around.length === 0) return null;
           return (
             <MapMarker key={level + c.id} map={map} lng={c.lng} lat={c.lat}>

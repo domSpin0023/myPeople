@@ -9,6 +9,36 @@ export const Z_CITY = 7;
 export const Z_RING = 11;
 export const Z_HOUSE = 14.5;
 
+/** How far apart (in screen pixels) two people's faces must be before they can stand at their own houses. */
+const SEPARATE_PX = 64;
+/** The most zoomed-in the map goes while still being useful. */
+const MAX_SPLIT_ZOOM = 18;
+
+const meters = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLon = (b.lon - a.lon) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+
+/**
+ * The size of an area decides when its people are separated out. At a given zoom one screen pixel covers
+ * 78271.5 x cos(latitude) / 2^zoom meters, so two people whose homes are `d` meters apart are `SEPARATE_PX`
+ * pixels apart once zoom reaches log2(78271.5 x cos(lat) x SEPARATE_PX / d). The area's zoom is the one that
+ * works for its closest pair, so nobody lands on top of anybody. One person alone (or no one close) separates
+ * as soon as the city is in view.
+ */
+export function separationZoom(members: Person[]): number {
+  const homes = members.filter((m) => m.place && m.place.precision === "address").map((m) => m.place!);
+  let closest = Infinity;
+  for (let i = 0; i < homes.length; i++) for (let j = i + 1; j < homes.length; j++) closest = Math.min(closest, meters(homes[i], homes[j]));
+  if (!isFinite(closest)) return Z_RING;
+  const lat = homes.reduce((s, h) => s + h.lat, 0) / homes.length;
+  const z = Math.log2((78271.5 * Math.cos((lat * Math.PI) / 180) * SEPARATE_PX) / Math.max(closest, 1));
+  return Math.min(MAX_SPLIT_ZOOM, Math.max(Z_RING, z));
+}
+
 export type DisplayLevel = "country" | "state" | "city" | "ring" | "house";
 
 export const levelForZoom = (z: number): DisplayLevel =>

@@ -25,7 +25,7 @@ The same people can be seen in different ways. Switch views with the control at 
 - **World** is a blank, pastel map of the earth. The only names on it are the places *you* add, and people appear as part of those places.
   - **Where they live.** On a person's page, add a location: a country, state, city or an exact address, any level of detail. A **nickname** ("Mom's house") is just a name for it and still has to be attached to a real place. Search is by OpenStreetMap; pick the right result.
   - **Places nest and regroup as you zoom.** Zoomed out, you see countries (*United States*); closer, states (*California*); closer, cities (*Escondido*, *San Diego*). Each place is a glass disc with a small collage of the people in it. Click a place to zoom in on it.
-  - **Closer still, people circle the place** the way they do on the relationship map, and at street level anyone with an exact address appears at their real house, labeled with the nickname if there is one.
+  - **Closer still, people circle the place** the way they do on the relationship map, and anyone with an exact address stands at their real house once their area is zoomed enough that nobody's face would overlap. The zoom is calculated from the area's size: the closest pair of homes in a city decides it (about 64 px apart on screen), so a lone person stands at their house as soon as the city is in view, and neighbours separate later. Until then they circle the middle of their homes. A nickname labels the house if there is one.
   - A person with only a state (say, *California*) stays grouped under that state at every closer zoom, since that is all that is known.
   - This view has no size or score: it is about where people are, not how involved you have been.
 

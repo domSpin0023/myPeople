@@ -8,6 +8,9 @@
 - Places **nest and regroup by zoom**: countries, then states, then cities as glass collage discs with the place name; closer in, people circle their city like the relationship map; at street level people with an exact address stand at their real house, labeled with the nickname. Clicking a place zooms in on it, and "Show everyone" frames all of them.
 - `docs/IDEAS.md`, a backlog of ideas not being built yet: myPlaces, a super-powered Life360, and role models (first example: Mike Rowe).
 
+### Changed (World view)
+- Exact-address people now separate out to their houses at a zoom **calculated from the size of their area** (the closest pair of homes in a city, so faces are about 64 px apart), instead of one fixed zoom. A lone person stands at their house as soon as the city is in view, so their face is never left behind as you zoom in.
+
 ### Added (lists and likes)
 - **Your own page:** click the "you" bubble in the center of the map to open it. It has the same four lists (your loves, gift ideas, events, ways to serve) and shows your name, color, birthday and where you live from your profile. It stores your lists as one special hidden entry (`people.is_self`, one per account; migration applied and in `supabase/schema.sql`) that never appears on the map, World view or contact import.
 - **List cards show the top four items by importance** (ties: newest first), with a count and **See more**. Rows lift on hover and are **selectable**; only when selected do **-** and **+** appear to change importance. The row holds its place until released, then slides to its new position.
