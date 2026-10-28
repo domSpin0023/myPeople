@@ -50,7 +50,7 @@ npm run dev
 
 To run it you need the app's database connected, a one-time step for whoever operates the app (not for users). Follow [docs/DATABASE.md](docs/DATABASE.md): create the Supabase project, run `supabase/schema.sql`, put the project URL and anon key in `.env.local` (copy `.env.example`), and restart the dev server. Until then, the app shows a plain "isn't available right now" message and logs a note about the missing settings to the browser console. Setup instructions are never shown inside the app.
 
-The dev server config in `.claude/launch.json` uses port 5174 so it can run beside myChart.
+The dev server always runs on **http://localhost:5174** (pinned in `vite.config.ts`, so it can run beside myChart). Google and Supabase sign-in send people back to that exact address, so open the app at `localhost`, not `127.0.0.1`, and not on another port. If port 5174 is taken, the server stops with an error instead of quietly picking another port.
 
 ## Documentation
 
