@@ -38,7 +38,7 @@ Light, bright and subtle: a soft pastel gradient backdrop, frosted-glass surface
 - The relationship map is a hand-built SVG (no chart library); the layout is in `src/layout.ts`, the scoring in `src/score.ts`
 - The **World** view uses **MapLibre GL** with free **OpenFreeMap** vector tiles (OpenStreetMap data) and a custom blank pastel style (`src/mapStyle.ts`). It loads only when you open the view.
 - Place search uses **OpenStreetMap Nominatim** (`src/geocode.ts`). Privacy: apart from the app's database, the only things sent off your machine are the text you type into a place search, and requests for map tiles for the area you are looking at. Search results are cached in the browser so a search is never repeated (that cache is the only thing kept in browser storage; your people live in the database).
-- **Supabase** (hosted Postgres) as **one shared database for all users** (`src/db.ts`, `supabase/schema.sql`). People sign up with an email and password; every row is tied to its owner and **Row Level Security** means the database only ever returns an account its own data. Changes appear on screen immediately and are saved in order by a small queue (`src/sync.ts`) that keeps retrying, and never drops a change, if the network or session fails. One-time operator setup: [docs/DATABASE.md](docs/DATABASE.md).
+- **Supabase** (hosted Postgres) as **one shared database for all users** (`src/db.ts`, `supabase/schema.sql`). People sign up with an email and password, or with **Google** once it is enabled (see [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md)); every row is tied to its owner and **Row Level Security** means the database only ever returns an account its own data. Changes appear on screen immediately and are saved in order by a small queue (`src/sync.ts`) that keeps retrying, and never drops a change, if the network or session fails. One-time operator setup: [docs/DATABASE.md](docs/DATABASE.md).
 - **Vercel** for hosting (planned)
 
 ## Run it
@@ -51,6 +51,16 @@ npm run dev
 To run it you need the app's database connected, a one-time step for whoever operates the app (not for users). Follow [docs/DATABASE.md](docs/DATABASE.md): create the Supabase project, run `supabase/schema.sql`, put the project URL and anon key in `.env.local` (copy `.env.example`), and restart the dev server. Until then, the app shows a plain "isn't available right now" message and logs a note about the missing settings to the browser console. Setup instructions are never shown inside the app.
 
 The dev server config in `.claude/launch.json` uses port 5174 so it can run beside myChart.
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [docs/DATABASE.md](docs/DATABASE.md) | One-time setup of the shared Supabase database: the project, the tables and privacy rules, sign-in settings, and the two connection values. Start here. |
+| [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md) | Optional "Continue with Google": the Google Cloud and Supabase steps, going live, and troubleshooting. |
+| [docs/IDEAS.md](docs/IDEAS.md) | The backlog: ideas being held for later (myPlaces, a super-powered Life360, "in town" nudges, role models). |
+| [supabase/schema.sql](supabase/schema.sql) | The database schema, with Row Level Security. |
+| [CHANGELOG.md](CHANGELOG.md) | What has changed, in order. |
 
 ## Plan
 

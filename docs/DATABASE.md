@@ -44,6 +44,10 @@ The app finds the database through two values that belong to the *app*, not to e
 
 If these are missing, the app shows a plain "isn't available right now" message and writes a note about the missing settings to the browser console. Nothing about setup is ever shown inside the app, and users are never asked to do anything with the database.
 
+## Optional: "Continue with Google"
+
+Add a **Continue with Google** button for people who would rather not make a password. It needs a one-time setup in Google Cloud and in the Supabase dashboard, and the button only appears once Google is switched on in the project. Full steps: [GOOGLE-SIGN-IN.md](GOOGLE-SIGN-IN.md).
+
 ## How saving works
 
 - Every change is saved to the database a moment after it is made. The top bar shows **Saving…** and then **Saved**.

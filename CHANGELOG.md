@@ -8,6 +8,10 @@
 - Places **nest and regroup by zoom**: countries, then states, then cities as glass collage discs with the place name; closer in, people circle their city like the relationship map; at street level people with an exact address stand at their real house, labeled with the nickname. Clicking a place zooms in on it, and "Show everyone" frames all of them.
 - `docs/IDEAS.md`, a backlog of ideas not being built yet: myPlaces, a super-powered Life360, and role models (first example: Mike Rowe).
 
+### Added (Google sign-in)
+- **Continue with Google** on the sign-in screen. It appears only when Google is enabled in the Supabase project (the app asks the project), so there is no broken button before setup. Setup steps are in the new `docs/GOOGLE-SIGN-IN.md` (Google Cloud and Supabase steps, going live, troubleshooting), and the README now has a Documentation index.
+- Sign-in now uses the PKCE flow, so tokens are not placed in the address bar (the hash is also used by the app's own pages). A cancelled or failed sign-in returns to the screen with a plain message and a clean address bar.
+
 ### Added (database)
 - **People now live in one shared database that serves every user**, not in the browser. The app uses a single Supabase Postgres project run by whoever operates the app, with a one-time operator setup in `docs/DATABASE.md` and the tables in `supabase/schema.sql` (people and items, with Row Level Security so each account only ever sees its own rows, and items must hang off the same account's own people).
 - **Sign-in:** anyone can create an account with an email and password. Users never deal with the database. If the app was built without its database connection, it shows a plain "isn't available right now" message and logs a note to the console; no setup instructions ever appear in the app.
