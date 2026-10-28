@@ -1,7 +1,9 @@
 import { useState } from "react";
-import type { HueKey, Item, ListMeta, Person, Weight } from "./types";
+import type { HueKey, Item, ListMeta, Person, PersonPlace, Weight } from "./types";
 import { HUES, HUE_KEYS, LISTS, RELATIONSHIPS } from "./types";
 import { involvement } from "./score";
+import type { GeoResult } from "./geocode";
+import { PRECISION_LABEL, searchPlaces } from "./geocode";
 
 interface Props {
   person: Person;
@@ -135,6 +137,113 @@ function ListCard({
   );
 }
 
+/** Where this person lives: a real place (any level of detail) plus an optional nickname for it. */
+function PlaceEditor({ place, onChange }: { place: PersonPlace | null | undefined; onChange: (p: PersonPlace | null) => void }) {
+  const [changing, setChanging] = useState(false);
+  const [query, setQuery] = useState("");
+  const [nick, setNick] = useState(place?.nickname ?? "");
+  const [results, setResults] = useState<GeoResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const searching = !place || changing;
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      setResults(await searchPlaces(query));
+    } catch {
+      setError("Couldn't reach the place search. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = (r: GeoResult) => {
+    onChange({ ...r, nickname: nick.trim() });
+    setChanging(false);
+    setResults(null);
+    setQuery("");
+  };
+
+  return (
+    <section className="place-card glass">
+      <header>
+        <h3>Where they live</h3>
+        <p>Any level works: a country, a state, a city, or an exact address. A nickname is just a name for it; it still needs a real place.</p>
+      </header>
+
+      {!searching && place && (
+        <div className="place-current">
+          <div className="place-name">
+            <strong>{place.name}</strong>
+            <span className="chip neutral">{PRECISION_LABEL[place.precision]}</span>
+          </div>
+          <label className="field">
+            Nickname
+            <input value={place.nickname} placeholder="e.g. Mom's house" onChange={(e) => onChange({ ...place, nickname: e.target.value })} />
+          </label>
+          <div className="place-actions">
+            <button
+              className="pill-btn"
+              onClick={() => {
+                setNick(place.nickname);
+                setChanging(true);
+              }}
+            >
+              Change place
+            </button>
+            <button className="pill-btn quiet" onClick={() => onChange(null)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
+
+      {searching && (
+        <div className="place-search">
+          <label className="field">
+            Nickname (optional)
+            <input value={nick} placeholder="e.g. Mom's house" onChange={(e) => setNick(e.target.value)} />
+          </label>
+          <div className="add-row">
+            <input
+              value={query}
+              placeholder="Search an address, city, state…"
+              aria-label="Search for a place"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
+            />
+            <button className="pill-btn primary" disabled={!query.trim() || busy} onClick={search}>
+              {busy ? "Searching…" : "Find"}
+            </button>
+          </div>
+          {error && <p className="field-error">{error}</p>}
+          {results && results.length === 0 && <p className="list-empty">No matches. Try adding a city or state.</p>}
+          {results && results.length > 0 && (
+            <ul className="results">
+              {results.map((r, i) => (
+                <li key={i}>
+                  <button onClick={() => pick(r)}>
+                    <span>{r.name}</span>
+                    <span className="chip neutral">{PRECISION_LABEL[r.precision]}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {place && changing && (
+            <button className="pill-btn quiet" onClick={() => setChanging(false)}>
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function PersonPage({ person, items, onUpdate, onDelete, onBack, onAddItem, onUpdateItem, onDeleteItem }: Props) {
   const stat = involvement(items, Date.now());
   const hue = HUES[person.hue];
@@ -212,6 +321,8 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
           />
         ))}
       </div>
+
+      <PlaceEditor place={person.place} onChange={(place) => onUpdate({ place })} />
 
       <section className="notes glass">
         <h3>Notes about {person.name || "them"}</h3>

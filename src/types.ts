@@ -36,6 +36,27 @@ export const HUE_KEYS = Object.keys(HUES) as HueKey[];
 
 export const RELATIONSHIPS = ["Partner", "Family", "Friend", "Colleague", "Other"];
 
+export type PlaceLevel = "country" | "state" | "city";
+
+export interface PlaceNode {
+  level: PlaceLevel;
+  name: string;
+}
+
+/** Where a person lives, attached to a real point on the earth. */
+export interface PersonPlace {
+  /** What you call it, like "Mom's house". Optional. */
+  nickname: string;
+  /** The full name from the geocoder, e.g. "Escondido, San Diego County, California, United States". */
+  name: string;
+  lat: number;
+  lon: number;
+  /** How specific it is: a country, a state, a city, or an exact address (a real point you can find). */
+  precision: PlaceLevel | "address";
+  /** Nested place names, outermost first. This is what groups people on the world map. */
+  chain: PlaceNode[];
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -43,6 +64,8 @@ export interface Person {
   hue: HueKey;
   notes: string;
   createdAt: number;
+  /** Where they live, if you have added a location. */
+  place?: PersonPlace | null;
 }
 
 export type Weight = 1 | 2 | 3;

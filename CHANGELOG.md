@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **World view**, a second way to see your people: a blank pastel map of the earth (MapLibre with OpenFreeMap tiles and a custom style) with no labels except the places you add. Switch between **Relationships** and **World** with the control at the top; browser back from a person returns to the view you came from.
+- **Where they live** on a person's page: search by address, city, state or country (OpenStreetMap Nominatim), pick a result, and optionally add a nickname. The result's nested place chain (country, state, city) and how exact it is are saved.
+- Places **nest and regroup by zoom**: countries, then states, then cities as glass collage discs with the place name; closer in, people circle their city like the relationship map; at street level people with an exact address stand at their real house, labeled with the nickname. Clicking a place zooms in on it, and "Show everyone" frames all of them.
+- `docs/IDEAS.md`, a backlog of ideas not being built yet: myPlaces, a super-powered Life360, and role models (first example: Mike Rowe).
+
+### Added (database)
+- **People now live in one shared database that serves every user**, not in the browser. The app uses a single Supabase Postgres project run by whoever operates the app, with a one-time operator setup in `docs/DATABASE.md` and the tables in `supabase/schema.sql` (people and items, with Row Level Security so each account only ever sees its own rows, and items must hang off the same account's own people).
+- **Sign-in:** anyone can create an account with an email and password. Users never deal with the database. If the app was built without its database connection, it shows a plain "isn't available right now" message and logs a note to the console; no setup instructions ever appear in the app.
+- **Saving that does not lose changes:** every edit shows on screen at once and is queued to the database in order. Typing is coalesced into one save, deleting a person drops their pending item saves, and if a save fails the app stops, keeps every change, shows "Not saved · Retry", warns before the tab is closed, and replays the queue on retry. The top bar shows Saving…, Saved, and a Sign out button.
+- If loading fails, a screen says so plainly (no database talk) and offers Try again.
+
+### Changed
+- Removed browser localStorage as the home of people and items (`src/storage.ts`). Only the place-search cache stays in the browser. Existing browser data is not imported (you chose to start fresh).
+
+### Fixed
+- The World view could blank the whole screen. If its code failed to load (for example the dev server was restarted underneath an open page, or the network dropped), nothing caught the error and the app unmounted. Every view now sits in an error boundary that shows a message with Reload and "Back to the relationship map" buttons, and the header stays usable. The whole app, including sign-in and loading, is also wrapped in a last-resort boundary, so a crash anywhere shows a message instead of a blank page.
+- The map now checks for WebGL up front and, if the map cannot start, shows "The map couldn't load" with a Try again button instead of an empty box (it also gives up after 12 seconds with no tiles).
+
 ## 0.2.0 - Restart as a relationship map
 
 The app was restarted around people. Everything below this entry describes the myChart timeline it grew from; that code was removed from the working tree (it remains in git history and in the myChart repo).
