@@ -2,47 +2,24 @@
 
 *(Working name.)* A place to backlog my acts of love: spending time with someone, getting gifts, planning events, and keeping track of the things I know about people and the ways I can serve them.
 
-This project started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1 (full history kept), a task timeline. The timeline is now one part of this app, used to map tasks to dates or spans of time.
+It started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1, a task timeline. The app was restarted around people; the timeline code is gone from the working tree but lives in git history and in the myChart repo, ready to come back as a view.
 
-## Vision (draft)
+## The idea
 
-- **People are the main object.** Each person has their own space, with different kinds of lists related to them: gift lists, loves lists, event lists, and so on.
-- **Items come in a few types.** Some are reminders with no date at all (try to connect with someone, do some act of service). Some are "do this by" tasks. A few are spans of time.
-- **The timeline is a view, not the whole app.** Items that have a date can be mapped onto it. It will mostly be **Due by** dates, since these are not calendar events, but **Timescale** (start and end) stays.
-- **Keep it simple and warm.** A backlog to draw from, not a to-do list that nags.
+- **The home page is a map.** You are the bubble in the center. Everyone else is placed around you by how involved you have been with them: more involved means **closer, bigger, and a thicker line**. People you have neglected drift to the edge and shrink, so gaps are easy to see.
+- **People are the main object.** Click a bubble to open that person's page.
+- **A person's page has lists:** *Loves* (things they love, so you remember), *Gift ideas*, *Events* and *Ways to serve*.
+- **Involvement comes from what you realize.** Check off a gift when you give it, an event when it happens, a way to serve when you do it. Each realized item earns points equal to its weight (1 to 3, for effort and meaning; click the dots to change it). Loves are notes and are not scored.
+- **Points fade slowly** (they halve every 120 days), so the map shows how involved you are *now*, not just ever. Level = 1 - e^(-points / 6), so the first few acts move someone a lot and the curve flattens as they approach fully involved.
 
-Still to be worked out together: the exact item types, what a person's page contains, how the timeline relates to the people view, and what notifications look like.
+## Look and feel
 
----
+Light, bright and subtle: a soft pastel gradient backdrop, frosted-glass surfaces, and bubbles drawn as flat glass discs (a soft diagonal sheen, not a shaded sphere). Each person has a soft light-to-deep gradient color.
 
-# The timeline (carried over from myChart v1)
-
-A very simple place to dump everything I need to do, then schedule it and keep track of it. It is a timeline (like GitHub Roadmap) combined with an issue board (like GitLab): tasks are rows on a zoomable calendar, and each opens into a full pullout panel.
-
-## Purpose of the v1 timeline
-
-I take instructions from my supervisor to talk to people and learn about topics and machines. myChart gave those a home:
-
-- **Capture fast.** Name a task and optionally give it a time: a **Timescale** (start and end) or a **Due by** (just an end).
-- **See it in time.** Every task is a row with a thin dotted colored line.
-- **Track status.** Inbox, Planned, In progress, Waiting, Done.
-- **Get nudged.** Phone push notifications for start times and stale items (planned).
-- **Stay simple.** No structure is forced on anything.
-
-## How it works
-
-- **Left list.** A self-contained pane with its own vertical scroll (the timeline follows it). Tasks listed top to bottom, with nested, collapsible sub-tasks and a color stripe from the task's label.
-- **Two kinds of time.** A **Timescale** is a dotted line between a start node and an end node. If the start has scrolled out of view behind the list, the line carries on from the list's edge. A **Due by** is a dotted line that comes out of the list edge, with no beginning, and stops at a vertical bar on the due date.
-- **Labels and colors.** A label is a name mapped to one color from a fixed palette, and a task picks one label. A color can only be used once a label owns it, so a new color means adding a label for it. The label picker (in the add bar and the task panel) is a dropdown where every label is editable in place with its pencil (rename, recolor, delete), and the small **+** beside the "Label" caption adds a new one. The starting labels are Talk to someone, Learn a topic, Learn a machine and Other.
-- **Zoom on the task rows.** Scroll the mouse wheel over the timeline rows to zoom continuously from hourly, through multiple days, out to weeks. The time under the cursor stays put.
-- **Markers.** Today is shaded dull red with red edge lines. Week starts (Sunday) get a subtle line and month starts a bold one, so you can read the scale at any zoom.
-- **Pan on the date bar.** Scrolling over the date/time bar moves the timeline left and right. Alt + scroll over the rows scrolls the list up and down.
-- **The list follows the view.** It shows tasks whose start or end is in view, or that span the whole view. Tasks with no time are always listed.
-- **Pullout panel.** Click a task to open title, description, status, label, time type and dates, requested by, who or what it involves, and sub-tasks.
-
-## Tech Stack
+## Tech stack
 
 - **Vite + React + TypeScript**
+- The map is a hand-built SVG (no chart library); the layout is in `src/layout.ts`, the scoring in `src/score.ts`
 - **localStorage** for persistence, behind one small module (`src/storage.ts`) so it can be swapped for a database
 - **Vercel** for hosting (planned)
 
@@ -53,11 +30,13 @@ npm install
 npm run dev
 ```
 
+The dev server config in `.claude/launch.json` uses port 5174 so it can run beside myChart.
+
 ## Plan
 
-1. **Foundation (done):** list, add task, pullout panel, sub-tasks, hourly timeline, wheel zoom, view-scoped list.
-2. **Time and calendar polish:** a Google Calendar-style week and month view at the far zoom levels, and drag tasks along the timeline to reschedule.
-3. **Fluid board feel:** drag rows to reorder and re-nest sub-tasks, in the spirit of a GitLab board.
-4. **Richer issues:** comments, and more fields as needed.
-5. **Backend and sync:** a database and a simple single-user login.
-6. **Phone push notifications:** installable web app with push for start times, stale items and a morning summary.
+1. **Map and people (done):** the relationship map, person pages, the four lists, and realized-item scoring.
+2. **Making the map better:** drag to nudge, group or tint by relationship, hover details, many-people layouts.
+3. **Richer items:** notes on an item, dates (a **Due by** or a **Timescale**, like the myChart timeline), recurring reminders to connect.
+4. **Timeline view:** bring the timeline back as one view of every dated item across people.
+5. **Reminders with no date:** gentle nudges to reach out to someone who has drifted away.
+6. **Backend, sync and phone notifications.**

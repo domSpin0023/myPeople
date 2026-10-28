@@ -1,216 +1,152 @@
-import { useEffect, useState } from "react";
-import type { Label, Task, TimeType } from "./types";
-import { TIME_TYPES } from "./types";
-import { loadLabels, loadTasks, saveLabels, saveTasks } from "./storage";
-import { interval } from "./logic";
-import Timeline from "./Timeline";
-import Panel from "./Panel";
-import LabelPicker from "./LabelPicker";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { HueKey, Item, ListKey, Person } from "./types";
+import { HUES, HUE_KEYS, RELATIONSHIPS } from "./types";
+import { loadItems, loadPeople, saveItems, savePeople } from "./storage";
+import { involvement } from "./score";
+import MapView from "./MapView";
+import PersonPage from "./PersonPage";
 
-const newTask = (
-  title: string,
-  parentId: string | null,
-  timeType: TimeType,
-  start: string | null,
-  end: string | null,
-  labelId: string | null,
-): Task => ({
-  id: crypto.randomUUID(),
-  parentId,
-  title,
-  description: "",
-  status: timeType === "none" ? "inbox" : "planned",
-  labelId,
-  timeType,
-  start,
-  end,
-  requestedBy: "",
-  involves: "",
-  collapsed: false,
-  createdAt: Date.now(),
-});
+const parseRoute = () => {
+  const m = window.location.hash.match(/^#\/p\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
 
-/** If a timescale ends up reversed, make the field that was not just edited follow the one that was. */
-function normalize(t: Task, patch: Partial<Task>): Task {
-  if (t.timeType === "span" && t.start && t.end && t.end < t.start) {
-    return "start" in patch ? { ...t, end: t.start } : { ...t, start: t.end };
-  }
-  return t;
+function AddPerson({ nextHue, onAdd }: { nextHue: HueKey; onAdd: (name: string, relationship: string, hue: HueKey) => void }) {
+  const root = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [relationship, setRelationship] = useState("Friend");
+  const [hue, setHue] = useState<HueKey | null>(null);
+  const chosen = hue ?? nextHue;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => root.current && !root.current.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const submit = () => {
+    if (!name.trim()) return;
+    onAdd(name.trim(), relationship, chosen);
+    setName("");
+    setHue(null);
+    setOpen(false);
+  };
+
+  return (
+    <div className="add-person" ref={root}>
+      <button className="pill-btn primary" aria-expanded={open} onClick={() => setOpen(!open)}>
+        + Add person
+      </button>
+      {open && (
+        <div className="popover glass" role="dialog" aria-label="Add a person">
+          <input
+            autoFocus
+            value={name}
+            placeholder="Name"
+            aria-label="Name"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+          <select value={relationship} aria-label="Relationship" onChange={(e) => setRelationship(e.target.value)}>
+            {RELATIONSHIPS.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+          <div className="hues" role="group" aria-label="Color">
+            {HUE_KEYS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={"hue" + (k === chosen ? " on" : "")}
+                aria-label={k}
+                aria-pressed={k === chosen}
+                style={{ background: `linear-gradient(135deg, ${HUES[k].light}, ${HUES[k].deep})` }}
+                onClick={() => setHue(k)}
+              />
+            ))}
+          </div>
+          <button className="pill-btn primary wide" disabled={!name.trim()} onClick={submit}>
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
-  const [tasks, setTasks] = useState<Task[]>(loadTasks);
-  const [labels, setLabels] = useState<Label[]>(loadLabels);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [addingUnder, setAddingUnder] = useState<string | null>(null);
-  const [reveal, setReveal] = useState<{ ms: number; n: number } | null>(null);
-  const [title, setTitle] = useState("");
-  const [timeType, setTimeType] = useState<TimeType>("none");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [labelId, setLabelId] = useState("");
+  const [people, setPeople] = useState<Person[]>(loadPeople);
+  const [items, setItems] = useState<Item[]>(loadItems);
+  const [routeId, setRouteId] = useState<string | null>(parseRoute);
 
-  useEffect(() => saveTasks(tasks), [tasks]);
-  useEffect(() => saveLabels(labels), [labels]);
-
+  useEffect(() => savePeople(people), [people]);
+  useEffect(() => saveItems(items), [items]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        setSelectedId(null);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const on = () => setRouteId(parseRoute());
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
   }, []);
 
-  const addTask = (
-    t: string,
-    parentId: string | null,
-    type: TimeType = "none",
-    s: string | null = null,
-    e: string | null = null,
-    label: string | null = null,
-  ) => {
-    const task = newTask(t, parentId, type, s, e, label);
-    setTasks((prev) => {
-      const next = [...prev, normalize(task, { start: s })];
-      return parentId ? next.map((p) => (p.id === parentId ? { ...p, collapsed: false } : p)) : next;
-    });
-    return task;
+  const stats = useMemo(() => {
+    const now = Date.now();
+    return new Map(people.map((p) => [p.id, involvement(items.filter((i) => i.personId === p.id), now)]));
+  }, [people, items]);
+
+  const open = (id: string) => {
+    window.location.hash = `/p/${encodeURIComponent(id)}`;
+  };
+  const home = () => {
+    window.location.hash = "/";
   };
 
-  // A time type only counts once its dates are filled in: no end date means no time,
-  // and a timescale without a start falls back to due-by.
-  const effective: TimeType = timeType === "none" || !end ? "none" : timeType === "span" && start ? "span" : "due";
-
-  const submit = () => {
-    if (!title.trim()) return;
-    const type = effective;
-    const task = addTask(
-      title.trim(),
-      null,
-      type,
-      type === "span" ? start : null,
-      type === "none" ? null : end,
-      labelId || null,
-    );
-    const iv = interval(task);
-    if (iv) setReveal({ ms: iv[0], n: Date.now() });
-    setTitle("");
-    setStart("");
-    setEnd("");
+  const addPerson = (name: string, relationship: string, hue: HueKey) =>
+    setPeople((prev) => [...prev, { id: crypto.randomUUID(), name, relationship, hue, notes: "", createdAt: Date.now() }]);
+  const updatePerson = (id: string, patch: Partial<Person>) => setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const deletePerson = (id: string) => {
+    setPeople((prev) => prev.filter((p) => p.id !== id));
+    setItems((prev) => prev.filter((i) => i.personId !== id));
+    home();
   };
+  const addItem = (personId: string, list: ListKey, title: string) =>
+    setItems((prev) => [...prev, { id: crypto.randomUUID(), personId, list, title, weight: 1, realizedAt: null, createdAt: Date.now() }]);
+  const updateItem = (id: string, patch: Partial<Item>) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const deleteItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 
-  const updateTask = (id: string, patch: Partial<Task>) =>
-    setTasks((prev) => prev.map((t) => (t.id === id ? normalize({ ...t, ...patch }, patch) : t)));
-
-  const deleteTask = (id: string) => {
-    setTasks((prev) => {
-      const doomed = new Set([id]);
-      let grew = true;
-      while (grew) {
-        grew = false;
-        for (const t of prev) {
-          if (t.parentId && doomed.has(t.parentId) && !doomed.has(t.id)) {
-            doomed.add(t.id);
-            grew = true;
-          }
-        }
-      }
-      return prev.filter((t) => !doomed.has(t.id));
-    });
-    setSelectedId(null);
-  };
-
-  const startAddChild = (id: string | null) => {
-    if (id) setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, collapsed: false } : t)));
-    setAddingUnder(id);
-  };
-
-  const changeLabels = (next: Label[]) => {
-    setLabels(next);
-    // tasks whose label was deleted fall back to no label
-    const ids = new Set(next.map((l) => l.id));
-    setTasks((prev) => (prev.some((t) => t.labelId && !ids.has(t.labelId)) ? prev.map((t) => (t.labelId && !ids.has(t.labelId) ? { ...t, labelId: null } : t)) : prev));
-    if (labelId && !ids.has(labelId)) setLabelId("");
-  };
-
-  const selected = tasks.find((t) => t.id === selectedId) ?? null;
+  const person = routeId ? people.find((p) => p.id === routeId) : undefined;
 
   return (
     <div className="app">
+      <div className="backdrop" aria-hidden="true" />
       <header className="topbar">
-        <h1>myPeople</h1>
-        <form
-          className="add"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <input
-            className="add-title"
-            placeholder="What needs doing?"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            aria-label="Task name"
-          />
-          <label className="when">
-            Time
-            <select value={timeType} onChange={(e) => setTimeType(e.target.value as TimeType)}>
-              {TIME_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {timeType === "span" && (
-            <label className="when">
-              Start
-              <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-            </label>
-          )}
-          {timeType !== "none" && (
-            <label className="when">
-              {timeType === "due" ? "Due by" : "End"}
-              <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
-            </label>
-          )}
-          <div className="when">
-            <LabelPicker labels={labels} value={labelId} onSelect={setLabelId} onChangeLabels={changeLabels} />
-          </div>
-          <button type="submit" className="primary" disabled={!title.trim()}>
-            Add
-          </button>
-        </form>
+        <button className="wordmark glass" onClick={home} aria-label="Go to the map">
+          <span className="dot" />
+          myPeople
+        </button>
+        {!person && <AddPerson nextHue={HUE_KEYS[people.length % HUE_KEYS.length]} onAdd={addPerson} />}
       </header>
 
-      <main className="main">
-        <Timeline
-          tasks={tasks}
-          labels={labels}
-          selectedId={selectedId}
-          addingUnder={addingUnder}
-          reveal={reveal}
-          onSelect={setSelectedId}
-          onToggleCollapse={(id) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, collapsed: !t.collapsed } : t)))}
-          onStartAddChild={startAddChild}
-          onAddChild={(pid, t) => addTask(t, pid)}
-        />
-        {selected && (
-          <Panel
-            key={selected.id}
-            task={selected}
-            tasks={tasks}
-            labels={labels}
-            onChange={updateTask}
-            onDelete={deleteTask}
-            onSelect={setSelectedId}
-            onAddChild={(pid, t) => addTask(t, pid)}
-            onChangeLabels={changeLabels}
-            onClose={() => setSelectedId(null)}
+      <main className="content">
+        {person ? (
+          <PersonPage
+            key={person.id}
+            person={person}
+            items={items.filter((i) => i.personId === person.id)}
+            onUpdate={(patch) => updatePerson(person.id, patch)}
+            onDelete={() => deletePerson(person.id)}
+            onBack={home}
+            onAddItem={(list, title) => addItem(person.id, list, title)}
+            onUpdateItem={updateItem}
+            onDeleteItem={deleteItem}
           />
+        ) : (
+          <MapView people={people} stats={stats} onOpen={open} />
         )}
       </main>
     </div>

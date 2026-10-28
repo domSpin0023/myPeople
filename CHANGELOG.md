@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - Restart as a relationship map
+
+The app was restarted around people. Everything below this entry describes the myChart timeline it grew from; that code was removed from the working tree (it remains in git history and in the myChart repo).
+
+### Added
+- **Relationship map** as the home page: you in the center, each person a glossy bubble placed by involvement (more involved is closer, bigger, with a thicker line). Hover shows points and acts; click opens the person.
+- **Person pages** with a name, relationship and color you can edit, an involvement ring, four lists (Loves, Gift ideas, Events, Ways to serve) and free-form notes.
+- **Scoring from realized items:** checking off a gift, event or way to serve earns points equal to its weight (1 to 3). Points fade with a 120-day half-life, so the map shows current involvement. Loves are not scored.
+- Add-person popover (name, relationship, color), hash routing so the browser back button works, and its own storage keys and dev port (5174).
+- Light, glassy visual style: pastel gradient backdrop, frosted-glass surfaces, and bubbles drawn as flat glass discs (a light-to-deep gradient with a soft diagonal sheen on the upper half, a faint rim and a low shadow) rather than shaded spheres.
+
+### Removed
+- The timeline, task panel and label picker from myChart v1.
+
+## Before the restart (myChart v1 history)
 
 ### Added (time types and labels)
 - Two kinds of time on a task: **Timescale** (start and end) and **Due by** (end only), plus "No time". Set them in the add bar (Time selector, then the dates) and in the pullout panel (Time switch).

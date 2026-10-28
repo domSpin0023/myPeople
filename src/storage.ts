@@ -1,69 +1,28 @@
-import type { Label, Task, TimeType } from "./types";
-import { STARTER_LABELS } from "./types";
+import type { Item, Person } from "./types";
 
 // All persistence goes through here so localStorage can be swapped for a
 // database later without touching the UI.
-const TASKS_KEY = "mypeople.tasks.v1";
-const LABELS_KEY = "mypeople.labels.v1";
+const PEOPLE_KEY = "mypeople.people.v2";
+const ITEMS_KEY = "mypeople.items.v2";
 
-const KINDS = ["talk", "topic", "machine", "other"];
-
-/** Upgrades tasks saved before labels and time types existed. */
-function migrate(raw: Record<string, unknown>): Task {
-  const t = { ...raw } as Record<string, unknown>;
-
-  if (!("labelId" in t)) {
-    t.labelId = typeof t.kind === "string" && KINDS.includes(t.kind) ? t.kind : null;
-  }
-  delete t.kind;
-
-  if (!t.timeType) {
-    const start = (t.start as string | null) ?? null;
-    const end = (t.end as string | null) ?? null;
-    let type: TimeType = "none";
-    if (start && end) type = "span";
-    else if (end) type = "due";
-    else if (start) {
-      // a lone start time becomes a due-by at that time
-      t.end = start;
-      t.start = null;
-      type = "due";
-    }
-    t.timeType = type;
-  }
-  return t as unknown as Task;
-}
-
-export function loadTasks(): Task[] {
+function load<T>(key: string): T[] {
   try {
-    const raw = localStorage.getItem(TASKS_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, unknown>[]).map(migrate) : [];
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveTasks(tasks: Task[]): void {
+function save(key: string, value: unknown): void {
   try {
-    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // storage unavailable or full; the app keeps working in memory
   }
 }
 
-export function loadLabels(): Label[] {
-  try {
-    const raw = localStorage.getItem(LABELS_KEY);
-    return raw ? (JSON.parse(raw) as Label[]) : STARTER_LABELS;
-  } catch {
-    return STARTER_LABELS;
-  }
-}
-
-export function saveLabels(labels: Label[]): void {
-  try {
-    localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
-  } catch {
-    // see saveTasks
-  }
-}
+export const loadPeople = () => load<Person>(PEOPLE_KEY);
+export const savePeople = (people: Person[]) => save(PEOPLE_KEY, people);
+export const loadItems = () => load<Item>(ITEMS_KEY);
+export const saveItems = (items: Item[]) => save(ITEMS_KEY, items);
