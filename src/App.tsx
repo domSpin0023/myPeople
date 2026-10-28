@@ -1,17 +1,27 @@
 import { useEffect, useState } from "react";
-import type { Task } from "./types";
-import { loadTasks, saveTasks } from "./storage";
+import type { Label, Task, TimeType } from "./types";
+import { TIME_TYPES } from "./types";
+import { loadLabels, loadTasks, saveLabels, saveTasks } from "./storage";
 import { interval } from "./logic";
 import Timeline from "./Timeline";
 import Panel from "./Panel";
+import LabelPicker from "./LabelPicker";
 
-const newTask = (title: string, parentId: string | null, start: string | null, end: string | null): Task => ({
+const newTask = (
+  title: string,
+  parentId: string | null,
+  timeType: TimeType,
+  start: string | null,
+  end: string | null,
+  labelId: string | null,
+): Task => ({
   id: crypto.randomUUID(),
   parentId,
   title,
   description: "",
-  status: start || end ? "planned" : "inbox",
-  kind: "other",
+  status: timeType === "none" ? "inbox" : "planned",
+  labelId,
+  timeType,
   start,
   end,
   requestedBy: "",
@@ -20,9 +30,9 @@ const newTask = (title: string, parentId: string | null, start: string | null, e
   createdAt: Date.now(),
 });
 
-/** If start and end end up reversed, make the field that was not just edited follow the one that was. */
+/** If a timescale ends up reversed, make the field that was not just edited follow the one that was. */
 function normalize(t: Task, patch: Partial<Task>): Task {
-  if (t.start && t.end && t.end < t.start) {
+  if (t.timeType === "span" && t.start && t.end && t.end < t.start) {
     return "start" in patch ? { ...t, end: t.start } : { ...t, start: t.end };
   }
   return t;
@@ -30,14 +40,18 @@ function normalize(t: Task, patch: Partial<Task>): Task {
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>(loadTasks);
+  const [labels, setLabels] = useState<Label[]>(loadLabels);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addingUnder, setAddingUnder] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{ ms: number; n: number } | null>(null);
   const [title, setTitle] = useState("");
+  const [timeType, setTimeType] = useState<TimeType>("none");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [labelId, setLabelId] = useState("");
 
   useEffect(() => saveTasks(tasks), [tasks]);
+  useEffect(() => saveLabels(labels), [labels]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -49,18 +63,37 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const addTask = (t: string, parentId: string | null, s: string | null, e: string | null) => {
-    const task = normalize(newTask(t, parentId, s, e), s ? { start: s } : { end: e });
+  const addTask = (
+    t: string,
+    parentId: string | null,
+    type: TimeType = "none",
+    s: string | null = null,
+    e: string | null = null,
+    label: string | null = null,
+  ) => {
+    const task = newTask(t, parentId, type, s, e, label);
     setTasks((prev) => {
-      const next = [...prev, task];
+      const next = [...prev, normalize(task, { start: s })];
       return parentId ? next.map((p) => (p.id === parentId ? { ...p, collapsed: false } : p)) : next;
     });
     return task;
   };
 
+  // A time type only counts once its dates are filled in: no end date means no time,
+  // and a timescale without a start falls back to due-by.
+  const effective: TimeType = timeType === "none" || !end ? "none" : timeType === "span" && start ? "span" : "due";
+
   const submit = () => {
     if (!title.trim()) return;
-    const task = addTask(title.trim(), null, start || null, end || null);
+    const type = effective;
+    const task = addTask(
+      title.trim(),
+      null,
+      type,
+      type === "span" ? start : null,
+      type === "none" ? null : end,
+      labelId || null,
+    );
     const iv = interval(task);
     if (iv) setReveal({ ms: iv[0], n: Date.now() });
     setTitle("");
@@ -94,6 +127,14 @@ export default function App() {
     setAddingUnder(id);
   };
 
+  const changeLabels = (next: Label[]) => {
+    setLabels(next);
+    // tasks whose label was deleted fall back to no label
+    const ids = new Set(next.map((l) => l.id));
+    setTasks((prev) => (prev.some((t) => t.labelId && !ids.has(t.labelId)) ? prev.map((t) => (t.labelId && !ids.has(t.labelId) ? { ...t, labelId: null } : t)) : prev));
+    if (labelId && !ids.has(labelId)) setLabelId("");
+  };
+
   const selected = tasks.find((t) => t.id === selectedId) ?? null;
 
   return (
@@ -115,13 +156,30 @@ export default function App() {
             aria-label="Task name"
           />
           <label className="when">
-            Start
-            <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            Time
+            <select value={timeType} onChange={(e) => setTimeType(e.target.value as TimeType)}>
+              {TIME_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
           </label>
-          <label className="when">
-            End
-            <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
-          </label>
+          {timeType === "span" && (
+            <label className="when">
+              Start
+              <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+            </label>
+          )}
+          {timeType !== "none" && (
+            <label className="when">
+              {timeType === "due" ? "Due by" : "End"}
+              <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </label>
+          )}
+          <div className="when">
+            <LabelPicker labels={labels} value={labelId} onSelect={setLabelId} onChangeLabels={changeLabels} />
+          </div>
           <button type="submit" className="primary" disabled={!title.trim()}>
             Add
           </button>
@@ -131,23 +189,26 @@ export default function App() {
       <main className="main">
         <Timeline
           tasks={tasks}
+          labels={labels}
           selectedId={selectedId}
           addingUnder={addingUnder}
           reveal={reveal}
           onSelect={setSelectedId}
           onToggleCollapse={(id) => setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, collapsed: !t.collapsed } : t)))}
           onStartAddChild={startAddChild}
-          onAddChild={(pid, t) => addTask(t, pid, null, null)}
+          onAddChild={(pid, t) => addTask(t, pid)}
         />
         {selected && (
           <Panel
             key={selected.id}
             task={selected}
             tasks={tasks}
+            labels={labels}
             onChange={updateTask}
             onDelete={deleteTask}
             onSelect={setSelectedId}
-            onAddChild={(pid, t) => addTask(t, pid, null, null)}
+            onAddChild={(pid, t) => addTask(t, pid)}
+            onChangeLabels={changeLabels}
             onClose={() => setSelectedId(null)}
           />
         )}

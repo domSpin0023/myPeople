@@ -9,9 +9,10 @@ export const startOfDay = (ms: number) => {
   return d.getTime();
 };
 
-/** [earliest, latest] of a task's start/end in ms, or null if it has no time. */
+/** [earliest, latest] of a task's time in ms, or null if it has none. A due-by task is just its due date. */
 export function interval(t: Task): [number, number] | null {
-  const vals = [t.start, t.end]
+  const times = t.timeType === "span" ? [t.start, t.end] : t.timeType === "due" ? [t.end] : [];
+  const vals = times
     .filter((s): s is string => !!s)
     .map((s) => new Date(s).getTime())
     .filter((n) => !Number.isNaN(n));

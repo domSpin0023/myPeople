@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Added (time types and labels)
+- Two kinds of time on a task: **Timescale** (start and end) and **Due by** (end only), plus "No time". Set them in the add bar (Time selector, then the dates) and in the pullout panel (Time switch).
+- A Due by task draws a dotted line out of the list edge with no beginning, ending in a vertical bar on the due date, in the task's label color.
+- **Labels** replace the fixed kinds. A label is a name mapped to one color from a fixed 12-color palette. A color can only be used by one label, so a new color needs a new label. The label picker, in the add bar and the task panel, is a dropdown where each label is editable in place (pencil: rename, recolor, delete) and a small + beside the "Label" caption adds a new one (the new label is selected for you). Deleting a label leaves its tasks without a label. The four old kinds are kept as starting labels.
+- Existing saved tasks are migrated automatically: kinds become labels and old start/end times become Timescale or Due by tasks (a lone start becomes a Due by at that time).
+
+### Changed (lines)
+- Dotted timeline lines are now 1px thick (they were 3px).
+
+### Added
+- Week markers (subtle lines at the start of each week, Sunday by default via `WEEK_START` in `src/Timeline.tsx`) and month markers (bold lines at the 1st, with the month shown in the header), through the header and all rows.
+- Today's edges are drawn as red lines, in the header cell and down the timeline.
+- Today is highlighted with a dull red band behind its column, running the full height of the timeline and tinting its header cell (light and dark themes).
+
+### Changed (layout)
+- A task and its sub-tasks now read as one block: the horizontal separator lines between a parent and its children (and between the children) are removed. A line remains below the whole block.
+- The task list is now its own opaque, self-contained pane instead of a sticky column over the timeline, so nothing shows through it. It has its own vertical scrollbar, and the timeline's vertical position follows it exactly. Alt + wheel over the timeline rows scrolls both. Hovering a row highlights it in both panes.
+
+### Fixed
+- Day boxes in the header drifted out of line with the hours, gridlines and today band (a few pixels after a couple of weeks of scrolling at fractional zoom). All header cells, gridlines and markers are now positioned from one time-to-pixel function instead of laid out side by side, and only the visible ones are rendered.
+- Days follow real local midnights, so a daylight-saving day is drawn 23 or 25 hours wide and hour labels stay on 00, 03, 06…
+
+### Changed
+- The timeline now fills the whole page height. The list column and the time grid continue below the last task instead of cutting off, and long lists still scroll.
+- Wheel zoom now applies when hovering the task rows, and scrolling over the date/time bar pans the timeline left and right (Alt + scroll over the rows scrolls the list vertically). This reverses the earlier assignment.
+
 ## 0.1.0 - First working slice
 
 ### Added

@@ -1,18 +1,31 @@
 import { useState } from "react";
-import type { Task } from "./types";
-import { KINDS, STATUSES } from "./types";
+import type { Label, Task } from "./types";
+import { STATUSES, TIME_TYPES } from "./types";
+import LabelPicker from "./LabelPicker";
 
 interface Props {
   task: Task;
   tasks: Task[];
+  labels: Label[];
   onChange: (id: string, patch: Partial<Task>) => void;
   onDelete: (id: string) => void;
   onSelect: (id: string) => void;
   onAddChild: (parentId: string, title: string) => void;
+  onChangeLabels: (labels: Label[]) => void;
   onClose: () => void;
 }
 
-export default function Panel({ task, tasks, onChange, onDelete, onSelect, onAddChild, onClose }: Props) {
+export default function Panel({
+  task,
+  tasks,
+  labels,
+  onChange,
+  onDelete,
+  onSelect,
+  onAddChild,
+  onChangeLabels,
+  onClose,
+}: Props) {
   const [childTitle, setChildTitle] = useState("");
   const parent = task.parentId ? tasks.find((t) => t.id === task.parentId) : undefined;
   const children = tasks.filter((t) => t.parentId === task.id).sort((a, b) => a.createdAt - b.createdAt);
@@ -52,32 +65,48 @@ export default function Panel({ task, tasks, onChange, onDelete, onSelect, onAdd
               ))}
             </select>
           </label>
-          <label>
-            Kind
-            <select value={task.kind} onChange={(e) => onChange(task.id, { kind: e.target.value as Task["kind"] })}>
-              {KINDS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
-                </option>
+          <LabelPicker
+            labels={labels}
+            value={task.labelId ?? ""}
+            onSelect={(id) => onChange(task.id, { labelId: id || null })}
+            onChangeLabels={onChangeLabels}
+          />
+          <div className="field-wide">
+            <span className="field-title">Time</span>
+            <div className="segmented" role="group" aria-label="Time type">
+              {TIME_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  className={task.timeType === t.value ? "on" : ""}
+                  aria-pressed={task.timeType === t.value}
+                  onClick={() => onChange(task.id, { timeType: t.value })}
+                >
+                  {t.label}
+                </button>
               ))}
-            </select>
-          </label>
-          <label>
-            Start
-            <input
-              type="datetime-local"
-              value={task.start ?? ""}
-              onChange={(e) => onChange(task.id, { start: e.target.value || null })}
-            />
-          </label>
-          <label>
-            End
-            <input
-              type="datetime-local"
-              value={task.end ?? ""}
-              onChange={(e) => onChange(task.id, { end: e.target.value || null })}
-            />
-          </label>
+            </div>
+          </div>
+          {task.timeType === "span" && (
+            <label>
+              Start
+              <input
+                type="datetime-local"
+                value={task.start ?? ""}
+                onChange={(e) => onChange(task.id, { start: e.target.value || null })}
+              />
+            </label>
+          )}
+          {task.timeType !== "none" && (
+            <label>
+              {task.timeType === "due" ? "Due by" : "End"}
+              <input
+                type="datetime-local"
+                value={task.end ?? ""}
+                onChange={(e) => onChange(task.id, { end: e.target.value || null })}
+              />
+            </label>
+          )}
           <label>
             Requested by
             <input value={task.requestedBy} onChange={(e) => onChange(task.id, { requestedBy: e.target.value })} />
