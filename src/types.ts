@@ -66,9 +66,25 @@ export interface Person {
   createdAt: number;
   /** Where they live, if you have added a location. */
   place?: PersonPlace | null;
+  /** "YYYY-MM-DD", or "--MM-DD" when the year is not known. */
+  birthday?: string | null;
+  /** A small thumbnail as a data URL. */
+  photo?: string | null;
 }
 
-export type Weight = 1 | 2 | 3;
+/** How the signed-in person describes themselves. One per account. */
+export interface Profile {
+  displayName: string;
+  /** A small thumbnail as a data URL. */
+  photo: string | null;
+  hue: HueKey;
+  birthday: string | null;
+  place: PersonPlace | null;
+}
+
+export const EMPTY_PROFILE: Profile = { displayName: "", photo: null, hue: "blue", birthday: null, place: null };
+
+export type Weight = 1 | 2 | 3 | 4;
 
 export interface Item {
   id: string;

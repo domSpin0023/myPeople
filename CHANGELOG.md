@@ -8,6 +8,27 @@
 - Places **nest and regroup by zoom**: countries, then states, then cities as glass collage discs with the place name; closer in, people circle their city like the relationship map; at street level people with an exact address stand at their real house, labeled with the nickname. Clicking a place zooms in on it, and "Show everyone" frames all of them.
 - `docs/IDEAS.md`, a backlog of ideas not being built yet: myPlaces, a super-powered Life360, and role models (first example: Mike Rowe).
 
+### Added (lists and likes)
+- **List cards show the top four items by importance** (ties: newest first), with a count and **See more**. Rows lift on hover and are **selectable**; only when selected do **-** and **+** appear to change importance. The row holds its place until released, then slides to its new position.
+- **Expanded list view:** a full-screen blob with every item as a floating bubble that keeps a buffer from its neighbours, drifts gently to the middle, can be dragged, and can be focused (one at a time) to choose **Small, Medium, Large or Favorite**. Importance is saved and works for all four lists.
+- **Favorite**, a fourth importance level, with a holographic shimmering look on list rows, bubbles and its buttons. Database: `items.weight` now allows 1 to 4 (migration applied; `supabase/schema.sql` updated). Favorites score like Large (3 points).
+- Importance is shown as fires. New `docs/LIKES-AND-CLOSENESS.md` documents how likes are recorded and how likeness and closeness are measured.
+
+### Added (your account)
+- **Avatar menu** at the top right: your photo (or initial), name and email, with **Your profile**, **Sign-in & security**, **Your data** and **Sign out**. The save status moved beside it. Sign out warns if changes have not been saved.
+- **Your profile:** a display name (it defaults to your Google name or the start of your email, and labels the center of your map), a photo (upload one, or use your Google photo; saved as a small thumbnail), a color, a birthday, and where you live. Your photo and name now appear on the center bubble of the relationship map.
+- **Sign-in & security:** change your email (with confirmation), set or change your password (8+ characters, which also lets Google-only accounts sign in with email), see which sign-in methods are connected and connect or disconnect Google (it will not let you remove your only way in), and sign out other devices or everywhere.
+- **Your data:** download everything (profile, people, items) as one JSON file, and delete your account and all its data behind a typed confirmation.
+- Database: a `profiles` table and a `delete_my_account()` function, applied to the project and added to `supabase/schema.sql`. The delete function was tested in a rolled-back transaction: it removed only the caller's data. Notes on the new Supabase settings (manual linking, leaked-password protection) are in `docs/DATABASE.md`.
+
+### Added (import contacts)
+- **Import contacts** button: pick who to add from your contacts, with search, Select all and Clear, names, photos and birthdays shown, and people already in the app marked "Already added" and skipped.
+- The dialog is styled to match the rest of the app: a light veil behind it instead of a dark one, a clean near-white panel, and white rounded cards with soft shadows for the source options and the contact rows (ticked rows get an accent tint), like the cards on a person's page. The "away at Google" marker expires after 10 minutes so a stale one can never reopen the dialog by surprise.
+- Two sources: **Google Contacts** (the app sends you to Google for read-only permission, then returns and opens the list) and a **contacts file (.vcf)** that works for iPhone, Outlook and other address books. The file reader handles vCard 2.1, 3.0 and 4.0, folded lines, base64 and data-URI photos, quoted-printable names, and Apple's "no year" birthdays.
+- People now have a **birthday** (month and day, year optional; impossible dates are rejected) and a **photo**, editable on their page. Photos are stored as a small saved copy (a 128px thumbnail) rather than a link, and show on bubbles, on the World map and on the person's page; the initial is used when there is no photo.
+- Database: two new columns on `people` (`birthday`, `photo`) with checks on the date format and photo size; `supabase/schema.sql` is updated and already applied to the project.
+- Setup for Google contacts (enable the People API and add the `contacts.readonly` scope) is in `docs/GOOGLE-SIGN-IN.md`.
+
 ### Added (Google sign-in)
 - **Continue with Google** on the sign-in screen. It appears only when Google is enabled in the Supabase project (the app asks the project), so there is no broken button before setup. Setup steps are in the new `docs/GOOGLE-SIGN-IN.md` (Google Cloud and Supabase steps, going live, troubleshooting), and the README now has a Documentation index.
 - Sign-in now uses the PKCE flow, so tokens are not placed in the address bar (the hash is also used by the app's own pages). A cancelled or failed sign-in returns to the screen with a plain message and a clean address bar.

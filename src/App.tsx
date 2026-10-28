@@ -1,24 +1,33 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import type { HueKey, Item, ListKey, Person } from "./types";
+import type { HueKey, Item, ListKey, Person, Profile } from "./types";
 import { HUES, HUE_KEYS, RELATIONSHIPS } from "./types";
 import * as db from "./db";
-import { sync, useSyncState } from "./sync";
+import { sync } from "./sync";
 import type { Account } from "./AuthGate";
 import { involvement } from "./score";
 import MapView from "./MapView";
 import PersonPage from "./PersonPage";
+import AccountMenu from "./AccountMenu";
+import AccountPage from "./AccountPage";
 import ErrorBoundary from "./ErrorBoundary";
+import ImportContacts, { norm } from "./ImportContacts";
+import { IMPORT_FLAG, googleImportPending } from "./contactsGoogle";
+import { toThumbnail } from "./photo";
+import type { Candidate } from "./vcard";
 
 // The world view brings in the map library, so it loads only when you open it.
 const WorldView = lazy(() => import("./WorldView"));
 
 type View = "map" | "world";
-type Route = { kind: View } | { kind: "person"; id: string };
+type Section = "profile" | "security" | "data";
+type Route = { kind: View } | { kind: "person"; id: string } | { kind: "account"; section: Section | null };
 
 const parseRoute = (): Route => {
   const h = window.location.hash;
   const m = h.match(/^#\/p\/(.+)$/);
   if (m) return { kind: "person", id: decodeURIComponent(m[1]) };
+  const a = h.match(/^#\/account(?:\/(profile|security|data))?$/);
+  if (a) return { kind: "account", section: (a[1] as Section | undefined) ?? null };
   return { kind: h === "#/world" ? "world" : "map" };
 };
 
@@ -97,42 +106,29 @@ function AddPerson({ nextHue, onAdd }: { nextHue: HueKey; onAdd: (name: string, 
   );
 }
 
-/** Whether your changes have reached the database, plus the account menu. */
-function AccountBar({ account }: { account: Account }) {
-  const s = useSyncState();
-  return (
-    <div className="account">
-      {s.error ? (
-        <button className="sync-pill bad" title={s.error} onClick={() => sync.retry()}>
-          Not saved · Retry
-        </button>
-      ) : s.pending > 0 ? (
-        <span className="sync-pill">Saving…</span>
-      ) : (
-        <span className="sync-pill ok">Saved</span>
-      )}
-      <button
-        className="pill-btn quiet"
-        title={`Signed in as ${account.email}`}
-        onClick={async () => {
-          const { pending, error } = sync.getSnapshot();
-          if ((pending > 0 || error) && !window.confirm("Some changes have not been saved yet. Sign out anyway and lose them?")) return;
-          sync.clear();
-          await account.signOut();
-        }}
-      >
-        Sign out
-      </button>
-    </div>
-  );
-}
-
-export default function App({ initialPeople, initialItems, account }: { initialPeople: Person[]; initialItems: Item[]; account: Account }) {
+export default function App({
+  initialPeople,
+  initialItems,
+  initialProfile,
+  account,
+}: {
+  initialPeople: Person[];
+  initialItems: Item[];
+  initialProfile: Profile;
+  account: Account;
+}) {
   const [people, setPeople] = useState<Person[]>(initialPeople);
   const [items, setItems] = useState<Item[]>(initialItems);
+  const [profile, setProfile] = useState<Profile>(initialProfile);
   // The latest lists, so several quick changes each build on the one before.
   const peopleRef = useRef(initialPeople);
   const itemsRef = useRef(initialItems);
+  const profileRef = useRef(initialProfile);
+  // How you are shown: your own name if you set one, otherwise one suggested from how you signed in.
+  const myName = profile.displayName.trim() || account.suggestedName;
+  // The import dialog; "resume" means we just came back from Google granting access to contacts.
+  const [importing, setImporting] = useState<{ resume: boolean } | null>(() => (googleImportPending() ? { resume: true } : null));
+  useEffect(() => sessionStorage.removeItem(IMPORT_FLAG), []);
   const [route, setRoute] = useState<Route>(parseRoute);
   // Which view you came from, so "back" from a person returns to it.
   const [lastView, setLastView] = useState<View>(() => {
@@ -157,7 +153,7 @@ export default function App({ initialPeople, initialItems, account }: { initialP
     const on = () => {
       const r = parseRoute();
       setRoute(r);
-      if (r.kind !== "person") setLastView(r.kind);
+      if (r.kind === "map" || r.kind === "world") setLastView(r.kind);
     };
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
@@ -186,12 +182,53 @@ export default function App({ initialPeople, initialItems, account }: { initialP
     setItems(next);
   };
   const saveP = (p: Person) => sync.save(`person:${p.id}`, () => db.upsertPerson(p));
+  // Your own profile: shown right away and saved like everything else.
+  const updateProfile = (patch: Partial<Profile>) => {
+    const next = { ...profileRef.current, ...patch };
+    profileRef.current = next;
+    setProfile(next);
+    sync.save("profile", () => db.upsertProfile(next));
+  };
   const saveI = (i: Item) => sync.save(`item:${i.personId}:${i.id}`, () => db.upsertItem(i));
 
   const addPerson = (name: string, relationship: string, hue: HueKey) => {
     const p: Person = { id: crypto.randomUUID(), name, relationship, hue, notes: "", createdAt: Date.now(), place: null };
     commitPeople([...peopleRef.current, p]);
     saveP(p);
+  };
+  /** Adds the chosen contacts, making a small saved copy of each photo, and returns how many were added. */
+  const importPeople = async (picked: Candidate[], progress: (done: number, total: number) => void) => {
+    const start = peopleRef.current.length;
+    const now = Date.now();
+
+    // Prepare photos several at a time (each is time-limited), so one slow image never stalls the rest.
+    const photos: (string | null)[] = new Array(picked.length).fill(null);
+    let next = 0;
+    let done = 0;
+    const worker = async () => {
+      while (next < picked.length) {
+        const i = next++;
+        const src = picked[i].photo;
+        photos[i] = src ? await toThumbnail(src) : null;
+        progress(++done, picked.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, picked.length) }, worker));
+
+    const created: Person[] = picked.map((c, i) => ({
+      id: crypto.randomUUID(),
+      name: c.name,
+      relationship: "Friend",
+      hue: HUE_KEYS[(start + i) % HUE_KEYS.length],
+      notes: "",
+      createdAt: now + i, // keeps them in the order chosen
+      place: null,
+      birthday: c.birthday,
+      photo: photos[i],
+    }));
+    commitPeople([...peopleRef.current, ...created]);
+    created.forEach(saveP);
+    return created.length;
   };
   const updatePerson = (id: string, patch: Partial<Person>) => {
     const cur = peopleRef.current.find((p) => p.id === id);
@@ -227,7 +264,11 @@ export default function App({ initialPeople, initialItems, account }: { initialP
   };
 
   const person = route.kind === "person" ? people.find((p) => p.id === route.id) : undefined;
-  const view: View | "person" = person ? "person" : route.kind === "world" ? "world" : "map";
+  const onAccount = route.kind === "account";
+  const view: View | "person" | "account" = onAccount ? "account" : person ? "person" : route.kind === "world" ? "world" : "map";
+  const openAccount = (section: Section | null) => {
+    window.location.hash = section ? `/account/${section}` : "/account";
+  };
 
   return (
     <div className="app">
@@ -245,14 +286,30 @@ export default function App({ initialPeople, initialItems, account }: { initialP
           ))}
         </nav>
         <div className="topbar-end">
-          {!person && <AddPerson nextHue={HUE_KEYS[people.length % HUE_KEYS.length]} onAdd={addPerson} />}
-          <AccountBar account={account} />
+          {view !== "person" && view !== "account" && (
+            <button className="pill-btn" onClick={() => setImporting({ resume: false })}>
+              Import contacts
+            </button>
+          )}
+          {view !== "person" && view !== "account" && <AddPerson nextHue={HUE_KEYS[people.length % HUE_KEYS.length]} onAdd={addPerson} />}
+          <AccountMenu account={account} profile={profile} name={myName} onOpen={openAccount} />
         </div>
       </header>
 
       <main className="content">
         <ErrorBoundary key={view + (person?.id ?? "")}>
-        {person ? (
+        {route.kind === "account" ? (
+          <AccountPage
+            account={account}
+            profile={profile}
+            name={myName}
+            people={people}
+            items={items}
+            section={route.section}
+            onChange={updateProfile}
+            onBack={back}
+          />
+        ) : person ? (
           <PersonPage
             key={person.id}
             person={person}
@@ -269,10 +326,20 @@ export default function App({ initialPeople, initialItems, account }: { initialP
             <WorldView people={people} onOpen={open} />
           </Suspense>
         ) : (
-          <MapView people={people} stats={stats} onOpen={open} />
+          <MapView people={people} stats={stats} onOpen={open} me={{ name: myName, photo: profile.photo }} />
         )}
         </ErrorBoundary>
       </main>
+
+      {importing && (
+        <ImportContacts
+          existing={new Set(people.map((p) => norm(p.name)))}
+          canUseGoogle={account.canUseGoogle}
+          resumeGoogle={importing.resume}
+          onImport={importPeople}
+          onClose={() => setImporting(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Item, Person } from "./types";
-import AuthGate from "./AuthGate";
+import type { Item, Person, Profile } from "./types";
+import AuthGate, { Loading } from "./AuthGate";
 import type { Account } from "./AuthGate";
 import { loadAll } from "./db";
 import App from "./App";
 
-type Data = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; people: Person[]; items: Item[] };
+type Data = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; people: Person[]; items: Item[]; profile: Profile };
 
 /** Loads your people from the database once you are signed in, then shows the app. */
 function DataLoader({ account }: { account: Account }) {
@@ -20,7 +20,7 @@ function DataLoader({ account }: { account: Account }) {
   }, []);
   useEffect(load, [load]);
 
-  if (data.status === "ready") return <App initialPeople={data.people} initialItems={data.items} account={account} />;
+  if (data.status === "ready") return <App initialPeople={data.people} initialItems={data.items} initialProfile={data.profile} account={account} />;
 
   return (
     <div className="app">
@@ -28,7 +28,7 @@ function DataLoader({ account }: { account: Account }) {
       <div className="gate">
         <section className="gate-card glass" role={data.status === "error" ? "alert" : "status"}>
           {data.status === "loading" ? (
-            <p className="gate-note">Loading your people…</p>
+            <Loading text="Loading your people…" />
           ) : (
             <>
               <h1>Couldn't load your people</h1>

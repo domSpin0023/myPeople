@@ -8,12 +8,14 @@ interface Props {
   people: Person[];
   stats: Map<string, Involvement>;
   onOpen: (id: string) => void;
+  /** You, in the center: your name and photo, if you have set them. */
+  me?: { name: string; photo: string | null };
 }
 
 const ZERO: Involvement = { points: 0, level: 0, acts: 0, last: null };
 
 /** The home page: you in the middle, everyone else placed by how involved you have been with them. */
-export default function MapView({ people, stats, onOpen }: Props) {
+export default function MapView({ people, stats, onOpen, me }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 600 });
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -99,12 +101,28 @@ export default function MapView({ people, stats, onOpen }: Props) {
           <g className="pop">
             <circle r={ME_R} cy={ME_R * 0.12} fill="#7d8bff" opacity="0.22" filter="url(#blur)" />
             <circle r={ME_R} fill="url(#body-me)" />
+            {me?.photo && (
+              <>
+                <clipPath id="clip-me">
+                  <circle r={ME_R} />
+                </clipPath>
+                <image href={me.photo} x={-ME_R} y={-ME_R} width={ME_R * 2} height={ME_R * 2} preserveAspectRatio="xMidYMid slice" clipPath="url(#clip-me)" />
+              </>
+            )}
             <circle r={ME_R} fill="url(#sheen)" />
             <circle r={ME_R - 0.75} fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="1.5" />
-            <text className="bubble-initial" y={ME_R * 0.02} fontSize={ME_R * 0.5}>
-              You
-            </text>
+            {!me?.photo && (
+              <text className="bubble-initial" y={ME_R * 0.02} fontSize={ME_R * 0.5}>
+                You
+              </text>
+            )}
           </g>
+          {/* your name, under your bubble like everyone else's */}
+          {me?.name && (
+            <text className="bubble-name" y={ME_R + 20}>
+              {me.name}
+            </text>
+          )}
         </g>
 
         {placed.map((p, i) => {
@@ -129,11 +147,21 @@ export default function MapView({ people, stats, onOpen }: Props) {
               <g className="pop" style={{ animationDelay: `${Math.min(i, 12) * 55}ms` }}>
                 <circle r={p.r} cy={p.r * 0.12} fill={hue.deep} opacity="0.22" filter="url(#blur)" />
                 <circle r={p.r} fill={`url(#body-${p.id})`} />
+                {person.photo && (
+                  <>
+                    <clipPath id={`clip-${p.id}`}>
+                      <circle r={p.r} />
+                    </clipPath>
+                    <image href={person.photo} x={-p.r} y={-p.r} width={p.r * 2} height={p.r * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${p.id})`} />
+                  </>
+                )}
                 <circle r={p.r} fill="url(#sheen)" />
                 <circle r={p.r - 0.75} fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="1.5" />
-                <text className="bubble-initial" y={p.r * 0.03} fontSize={p.r * 0.62}>
-                  {person.name.trim().charAt(0).toUpperCase() || "?"}
-                </text>
+                {!person.photo && (
+                  <text className="bubble-initial" y={p.r * 0.03} fontSize={p.r * 0.62}>
+                    {person.name.trim().charAt(0).toUpperCase() || "?"}
+                  </text>
+                )}
               </g>
               {/* label on the outer side so it never sits on the line to the center */}
               <text className="bubble-name" y={p.y < cy ? -(p.r + 12) : p.r + 20}>

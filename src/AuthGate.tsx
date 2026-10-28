@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { enabledProviders, supabase } from "./supabase";
+import { rememberProviderToken } from "./contactsGoogle";
 
 /** The standard multicolor Google "G". */
 function GoogleG() {
@@ -17,7 +18,35 @@ function GoogleG() {
 
 export interface Account {
   email: string;
-  signOut: () => Promise<void>;
+  /** True when this account signs in with Google, which is what reading Google contacts needs. */
+  canUseGoogle: boolean;
+  /** A name to start from: the Google name, or the start of the email address. */
+  suggestedName: string;
+  /** The Google profile picture address, if there is one. */
+  googlePhoto: string | null;
+  /** "local" signs out here; "others" signs out every other device; "global" signs out everywhere. */
+  signOut: (scope?: "local" | "others" | "global") => Promise<void>;
+}
+
+/** A loading message that offers a way out if it takes too long, so nobody is left staring at a spinner. */
+export function Loading({ text }: { text: string }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <>
+      <p className="gate-note" role="status">
+        {slow ? "This is taking longer than usual." : text}
+      </p>
+      {slow && (
+        <button className="pill-btn primary" onClick={() => window.location.reload()}>
+          Reload
+        </button>
+      )}
+    </>
+  );
 }
 
 function Screen({ children }: { children: ReactNode }) {
@@ -86,8 +115,18 @@ function SignIn({ client }: { client: SupabaseClient }) {
     if (error) {
       setMessage({ text: error.message, bad: true });
       setBusy(false);
+      return;
     }
+    // If we are still here after a few seconds, the browser did not go to Google; do not stay locked.
+    window.setTimeout(() => setBusy(false), 10_000);
   };
+
+  // Pressing Back from Google can restore this page exactly as it was left (button greyed out). Reset it.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => e.persisted && setBusy(false);
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -169,20 +208,42 @@ function Authed({ client, children }: { client: SupabaseClient; children: (accou
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
-    client.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = client.auth.onAuthStateChange((_event, s) => setSession(s));
+    // Google hands over a short-lived token for reading contacts only at sign-in; keep it in memory for the import.
+    client.auth.getSession().then(({ data }) => {
+      rememberProviderToken(data.session?.provider_token);
+      setSession(data.session);
+    });
+    const { data } = client.auth.onAuthStateChange((_event, s) => {
+      rememberProviderToken(s?.provider_token);
+      setSession(s);
+    });
     return () => data.subscription.unsubscribe();
   }, [client]);
 
   if (session === undefined) {
     return (
       <Screen>
-        <p className="gate-note">Loading…</p>
+        <Loading text="Loading…" />
       </Screen>
     );
   }
   if (!session) return <SignIn client={client} />;
-  return <>{children({ email: session.user.email ?? "you", signOut: async () => void (await client.auth.signOut()) })}</>;
+  const canUseGoogle = session.user.identities?.some((i) => i.provider === "google") ?? false;
+  const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
+  const email = session.user.email ?? "";
+  const suggestedName = String(meta.full_name ?? meta.name ?? "").trim() || email.split("@")[0] || "";
+  const googlePhoto = String(meta.avatar_url ?? meta.picture ?? "") || null;
+  return (
+    <>
+      {children({
+        email: email || "you",
+        canUseGoogle,
+        suggestedName,
+        googlePhoto,
+        signOut: async (scope = "local") => void (await client.auth.signOut({ scope })),
+      })}
+    </>
+  );
 }
 
 /** Everything inside needs a database connection and a signed-in account. */

@@ -35,6 +35,22 @@ Use location data to nudge you to connect when someone is near.
   - What counts as near: same city, same region, or within some distance?
   - How loud should the nudge be? It should feel like a gentle reminder, not noise.
 
+## You, on the world map
+
+Your profile now has "where you live". The World view could show you too, as a place marker among your people, which would also make "in town" nudges natural: "Priya is visiting San Diego, and so are you."
+
+- Show your own bubble (photo and name) at your home place on the World view.
+- Use your place to measure "near", for the "in town" idea above.
+- **Open question:** whether you should appear on the map at all by default, since it is your own location data.
+
+## Birthday nudges
+
+Now that people can have a birthday (from imported contacts or typed in), the app could gently remind you before one comes up, and pair it with the lists: "Maya's birthday is in two weeks. Her gift ideas: …".
+
+- Fits the "get nudged" goal without being noisy: a short look-ahead (for example, the next 30 days) on the home page, before any push notifications exist.
+- Birthdays with no year still work, since only the month and day are needed.
+- **Open questions:** how far ahead, whether to show age, and whether a birthday can create a dated "Do this by" item.
+
 ## Role models
 
 A way to track people who are **not true connections**, but who are a source of motivation. For example: **Mike Rowe**.
@@ -49,3 +65,13 @@ A way to track people who are **not true connections**, but who are a source of 
 - **Open questions:**
   - Should role models live in their own space, or as a different kind of entry alongside people?
   - Is there any scoring at all, or is it purely a collection?
+
+## Suggestions (gifts, ways to serve, events) from what you know
+
+The app could recognize and suggest things based on a person's likes, and later also surface places or events.
+
+- **One place per relation.** A single suggestions area on each person's page.
+- **In context.** Suggestions also appear when you focus on a like: for the top four likes on the main page, or as a sidebar popup in the expanded blob view.
+- **Suggested kinds:** gift ideas, ways to serve, and events, drawn from likes (and, later, favorites, birthdays and location).
+- **Possible sponsored suggestions** for events and gifts. If this ever happens, any sponsored item must be **clearly labeled as sponsored**, never disguised as an ordinary suggestion, and easy to hide.
+- **Open questions:** where suggestions come from (rules, a model, partners), what data would leave the app to produce them, and how to keep it feeling like care rather than marketing.

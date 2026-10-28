@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { HueKey, Item, ListMeta, Person, PersonPlace, Weight } from "./types";
 import { HUES, HUE_KEYS, LISTS, RELATIONSHIPS } from "./types";
 import { involvement } from "./score";
+import BlobView from "./BlobView";
+import { MONTH_NAMES, makeBirthday, parseBirthday } from "./birthday";
 import type { GeoResult } from "./geocode";
 import { PRECISION_LABEL, searchPlaces } from "./geocode";
 
@@ -50,22 +52,66 @@ function Ring({ level, hue }: { level: number; hue: HueKey }) {
   );
 }
 
+/** A card shows only the newest few items; as more are added the oldest slip out of view (first in, first out). */
+const CARD_ITEMS = 4;
+
 function ListCard({
   meta,
   items,
+  hue,
   onAdd,
   onUpdateItem,
   onDeleteItem,
 }: {
   meta: ListMeta;
   items: Item[];
+  hue: HueKey;
   onAdd: (title: string) => void;
   onUpdateItem: (id: string, patch: Partial<Item>) => void;
   onDeleteItem: (id: string) => void;
 }) {
   const [draft, setDraft] = useState("");
-  const open = items.filter((i) => i.realizedAt === null).sort((a, b) => a.createdAt - b.createdAt);
-  const done = items.filter((i) => i.realizedAt !== null).sort((a, b) => b.realizedAt! - a.realizedAt!);
+  const [expanded, setExpanded] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  // while a row is selected the rows hold their places; they re-sort once it is let go
+  const [frozen, setFrozen] = useState<string[] | null>(null);
+  // oldest first, so the newest four are the last four
+  const ordered = [...items].sort((a, b) => a.createdAt - b.createdAt);
+  const ranked = [...ordered].sort((a, b) => b.weight - a.weight || b.createdAt - a.createdAt).slice(0, CARD_ITEMS);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const shown = frozen ? frozen.map((id) => byId.get(id)).filter((i): i is Item => !!i) : ranked;
+  // when rows change places, slide each from where it was to where it is now
+  const listRef = useRef<HTMLUListElement>(null);
+  const tops = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const rows = [...(listRef.current?.querySelectorAll<HTMLElement>("li[data-id]") ?? [])];
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, number>();
+    for (const el of rows) {
+      const id = el.dataset.id!;
+      const top = el.getBoundingClientRect().top;
+      next.set(id, top);
+      const was = tops.current.get(id);
+      if (reduce || was === undefined || Math.abs(was - top) < 1) continue;
+      el.style.transition = "none";
+      el.style.transform = `translateY(${was - top}px)`;
+      el.getBoundingClientRect();
+      el.style.transition = "transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)";
+      el.style.transform = "";
+      window.setTimeout(() => (el.style.transition = ""), 480);
+    }
+    tops.current = next;
+  });
+  const pick = (id: string) => {
+    if (picked === id) {
+      setPicked(null);
+      setFrozen(null);
+    } else {
+      setPicked(id);
+      setFrozen((f) => f ?? ranked.map((i) => i.id));
+    }
+  };
+  const hidden = ordered.length - shown.length;
 
   const add = () => {
     if (!draft.trim()) return;
@@ -75,9 +121,16 @@ function ListCard({
 
   return (
     <section className="list-card glass">
-      <header>
-        <h3>{meta.title}</h3>
-        <p>{meta.hint}</p>
+      <header className="list-head">
+        <div>
+          <h3>
+            {meta.title} {items.length > 0 && <span className="count">{items.length}</span>}
+          </h3>
+          <p>{meta.hint}</p>
+        </div>
+        <button className="icon-btn expand" aria-label={`Open all of ${meta.title}`} title="Open them all" disabled={items.length === 0} onClick={() => setExpanded(true)}>
+          ⤢
+        </button>
       </header>
       <div className="add-row">
         <input
@@ -92,11 +145,11 @@ function ListCard({
         </button>
       </div>
       {items.length === 0 && <p className="list-empty">Nothing here yet.</p>}
-      <ul className="items">
-        {[...open, ...done].map((it) => {
+      <ul className="items" ref={listRef}>
+        {shown.map((it) => {
           const isDone = it.realizedAt !== null;
           return (
-            <li key={it.id} className={"item" + (isDone ? " done" : "")}>
+            <li key={it.id} data-id={it.id} className={"item" + (isDone ? " done" : "") + (picked === it.id ? " picked" : "") + (it.weight === 4 ? " fav" : "")}>
               {meta.scored && (
                 <button
                   className="check"
@@ -107,7 +160,14 @@ function ListCard({
                   {isDone ? "✓" : ""}
                 </button>
               )}
-              <div className="item-main">
+              <div
+                className="item-main"
+                role="button"
+                tabIndex={0}
+                aria-pressed={picked === it.id}
+                onClick={() => pick(it.id)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), pick(it.id))}
+              >
                 <span className="item-title">{it.title}</span>
                 {isDone && (
                   <span className="chip">
@@ -115,15 +175,17 @@ function ListCard({
                   </span>
                 )}
               </div>
-              {meta.scored && (
-                <button
-                  className="weight"
-                  title="Effort and meaning: click to change. Bigger acts count for more."
-                  aria-label={`Weight ${it.weight} of 3`}
-                  onClick={() => onUpdateItem(it.id, { weight: ((it.weight % 3) + 1) as Weight })}
-                >
-                  {"●".repeat(it.weight)}
-                  <span className="faint">{"●".repeat(3 - it.weight)}</span>
+              {picked === it.id && (
+                <button className="step" aria-label={`Less important: ${it.title}`} disabled={it.weight <= 1} onClick={() => onUpdateItem(it.id, { weight: (it.weight - 1) as Weight })}>
+                  −
+                </button>
+              )}
+              <span className="weight" title={`Importance: ${["small", "medium", "large", "favorite"][it.weight - 1]}`}>
+                {it.weight === 4 ? <span className="fav-mark">★ Favorite</span> : it.weight === 1 ? <span className="faint">🔥</span> : "🔥".repeat(it.weight - 1)}
+              </span>
+              {picked === it.id && (
+                <button className={"step" + (it.weight === 3 ? " fav" : "")} aria-label={it.weight === 3 ? `Make ${it.title} a favorite` : `More important: ${it.title}`} title={it.weight === 3 ? "Make it a favorite" : undefined} disabled={it.weight >= 4} onClick={() => onUpdateItem(it.id, { weight: (it.weight + 1) as Weight })}>
+                  +
                 </button>
               )}
               <button className="x" aria-label={`Delete ${it.title}`} onClick={() => onDeleteItem(it.id)}>
@@ -133,12 +195,106 @@ function ListCard({
           );
         })}
       </ul>
+      {hidden > 0 && (
+        <button className="more-link" onClick={() => setExpanded(true)}>
+          See more
+        </button>
+      )}
+      {expanded && <BlobView meta={meta} items={ordered} hue={hue} onUpdateItem={onUpdateItem} onClose={() => setExpanded(false)} />}
     </section>
   );
 }
 
+/** A birthday: month and day, with the year optional. Saved only once it is a real date. */
+export function BirthdayField({ value, onChange }: { value: string | null; onChange: (b: string | null) => void }) {
+  const initialParts = parseBirthday(value);
+  const [month, setMonth] = useState(initialParts?.month ?? 0);
+  const [day, setDay] = useState(initialParts?.day ?? 0);
+  const [year, setYear] = useState(initialParts?.year ? String(initialParts.year) : "");
+
+  const commit = (m: number, d: number, y: string) => {
+    if (!m && !d && !y) return onChange(null);
+    if (!m || !d) return; // wait until both month and day are chosen
+    const parsed = y.trim() === "" ? null : Number(y);
+    const b = makeBirthday(m, d, parsed);
+    if (b) onChange(b);
+  };
+  const invalid = !!month && !!day && makeBirthday(month, day, year.trim() === "" ? null : Number(year)) === null;
+
+  return (
+    <div className="birthday" role="group" aria-label="Birthday">
+      <span className="field-title">Birthday</span>
+      <select
+        value={month}
+        aria-label="Month"
+        onChange={(e) => {
+          setMonth(Number(e.target.value));
+          commit(Number(e.target.value), day, year);
+        }}
+      >
+        <option value={0}>Month</option>
+        {MONTH_NAMES.map((m, i) => (
+          <option key={m} value={i + 1}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <select
+        value={day}
+        aria-label="Day"
+        onChange={(e) => {
+          setDay(Number(e.target.value));
+          commit(month, Number(e.target.value), year);
+        }}
+      >
+        <option value={0}>Day</option>
+        {Array.from({ length: 31 }, (_, i) => (
+          <option key={i} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+      <input
+        className="year-input"
+        inputMode="numeric"
+        placeholder="Year (optional)"
+        aria-label="Year"
+        value={year}
+        onChange={(e) => {
+          const y = e.target.value.replace(/\D/g, "").slice(0, 4);
+          setYear(y);
+          if (y.length === 4 || y === "") commit(month, day, y);
+        }}
+      />
+      {invalid && <span className="field-error">That date doesn't exist.</span>}
+      {(month || day || year) && (
+        <button
+          className="pill-btn quiet"
+          type="button"
+          onClick={() => {
+            setMonth(0);
+            setDay(0);
+            setYear("");
+            onChange(null);
+          }}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Where this person lives: a real place (any level of detail) plus an optional nickname for it. */
-function PlaceEditor({ place, onChange }: { place: PersonPlace | null | undefined; onChange: (p: PersonPlace | null) => void }) {
+export function PlaceEditor({
+  place,
+  onChange,
+  title = "Where they live",
+}: {
+  place: PersonPlace | null | undefined;
+  onChange: (p: PersonPlace | null) => void;
+  title?: string;
+}) {
   const [changing, setChanging] = useState(false);
   const [query, setQuery] = useState("");
   const [nick, setNick] = useState(place?.nickname ?? "");
@@ -170,7 +326,7 @@ function PlaceEditor({ place, onChange }: { place: PersonPlace | null | undefine
   return (
     <section className="place-card glass">
       <header>
-        <h3>Where they live</h3>
+        <h3>{title}</h3>
         <p>Any level works: a country, a state, a city, or an exact address. A nickname is just a name for it; it still needs a real place.</p>
       </header>
 
@@ -265,8 +421,11 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
       </div>
 
       <section className="hero glass">
-        <div className="avatar" style={{ background: `linear-gradient(135deg, ${hue.light}, ${hue.deep})` }}>
-          <span>{person.name.trim().charAt(0).toUpperCase() || "?"}</span>
+        <div
+          className="avatar"
+          style={{ background: `${person.photo ? `url("${person.photo}") center / cover no-repeat, ` : ""}linear-gradient(135deg, ${hue.light}, ${hue.deep})` }}
+        >
+          <span>{!person.photo && (person.name.trim().charAt(0).toUpperCase() || "?")}</span>
         </div>
         <div className="hero-main">
           <input
@@ -295,6 +454,14 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
               ))}
             </div>
           </div>
+          <div className="hero-row">
+            <BirthdayField value={person.birthday ?? null} onChange={(birthday) => onUpdate({ birthday })} />
+            {person.photo && (
+              <button className="pill-btn quiet" onClick={() => onUpdate({ photo: null })}>
+                Remove photo
+              </button>
+            )}
+          </div>
         </div>
         <div className="involve">
           <Ring level={stat.level} hue={person.hue} />
@@ -314,6 +481,7 @@ export default function PersonPage({ person, items, onUpdate, onDelete, onBack, 
           <ListCard
             key={meta.key}
             meta={meta}
+            hue={person.hue}
             items={items.filter((i) => i.list === meta.key)}
             onAdd={(title) => onAddItem(meta.key, title)}
             onUpdateItem={onUpdateItem}

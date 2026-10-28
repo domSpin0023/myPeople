@@ -10,8 +10,11 @@ It started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1, a 
 
 - **The home page is a map.** You are the bubble in the center. Everyone else is placed around you by how involved you have been with them: more involved means **closer, bigger, and a thicker line**. People you have neglected drift to the edge and shrink, so gaps are easy to see.
 - **People are the main object.** Click a bubble to open that person's page.
+- **Your own account area.** Your avatar (top right) opens a menu to **Your profile** (a name, photo, color, birthday and where you live, shown at the center of your map), **Sign-in & security** (change email or password, connect Google, sign out other devices or everywhere) and **Your data** (download everything as one file, or delete your account and all its data). Sign out is in the menu.
+- **Bring in people you already know.** **Import contacts** reads your contacts and lets you pick who to add, with their names, photos (if there is one) and birthdays (if there is one). Sources are **Google Contacts** (for accounts that sign in with Google; see [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md)) and a **contacts file (.vcf)**, which works for iPhone, Outlook and any address book. People already added are marked and skipped. Photos are saved as small thumbnails so they never break.
 - **A person's page has lists:** *Loves* (things they love, so you remember), *Gift ideas*, *Events* and *Ways to serve*.
-- **Involvement comes from what you realize.** Check off a gift when you give it, an event when it happens, a way to serve when you do it. Each realized item earns points equal to its weight (1 to 3, for effort and meaning; click the dots to change it). Loves are notes and are not scored.
+- **Involvement comes from what you realize.** Check off a gift when you give it, an event when it happens, a way to serve when you do it. Each realized item earns points equal to its importance (Small 1, Medium 2, Large and Favorite 3). Loves are notes and are not scored.
+- **Every item has a level of importance (likeness)**: Small, Medium, Large, or a holographic **Favorite**. List cards show the top four; the expand button opens every item as a floating bubble you can focus and resize. How this is recorded and measured: [docs/LIKES-AND-CLOSENESS.md](docs/LIKES-AND-CLOSENESS.md).
 - **Points fade slowly** (they halve every 120 days), so the map shows how involved you are *now*, not just ever. Level = 1 - e^(-points / 6), so the first few acts move someone a lot and the curve flattens as they approach fully involved.
 
 ## Views
@@ -58,6 +61,7 @@ The dev server always runs on **http://localhost:5174** (pinned in `vite.config.
 | --- | --- |
 | [docs/DATABASE.md](docs/DATABASE.md) | One-time setup of the shared Supabase database: the project, the tables and privacy rules, sign-in settings, and the two connection values. Start here. |
 | [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md) | Optional "Continue with Google": the Google Cloud and Supabase steps, going live, and troubleshooting. |
+| [docs/LIKES-AND-CLOSENESS.md](docs/LIKES-AND-CLOSENESS.md) | How likes are recorded, and the exact metrics for likeness (importance) and closeness (involvement). |
 | [docs/IDEAS.md](docs/IDEAS.md) | The backlog: ideas being held for later (myPlaces, a super-powered Life360, "in town" nudges, role models). |
 | [supabase/schema.sql](supabase/schema.sql) | The database schema, with Row Level Security. |
 | [CHANGELOG.md](CHANGELOG.md) | What has changed, in order. |

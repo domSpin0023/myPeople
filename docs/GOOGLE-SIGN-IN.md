@@ -60,10 +60,35 @@ Open [console.cloud.google.com](https://console.cloud.google.com).
 
 While the Google app is in **Testing**, only the **test users** you list on the consent screen can sign in; anyone else sees an "access blocked" message. To open it to everyone, go to **Google Auth Platform > Audience** and choose **Publish app**. Basic sign-in (email and profile) does not need Google's verification process. Also add the production address to both Google's **Authorized JavaScript origins** and Supabase's **Redirect URLs**.
 
+## Optional: importing Google Contacts
+
+The app's **Import contacts** button can read a person's Google contacts (names, photos and birthdays) so they can pick who to add. Unlike sign-in, this reads data from the person's Google account, so it needs one more permission and one more switch in Google Cloud. If you skip this, the **contacts file (.vcf)** option still works for everyone, and the Google option simply fails with a clear message.
+
+**How it behaves for the person using the app**
+- Only people who sign in with Google see the Google option as available.
+- Clicking it sends them to Google, which asks permission to **read their contacts** (read-only). They come straight back to the app, and the pick-from-your-list screen opens.
+- Nothing is added until they choose people and press Import. People already in the app are marked "Already added" and cannot be picked twice.
+- The app keeps a small resized copy of each photo and the birthday, and does **not** keep the Google access token, which exists only in memory for the import.
+
+**One-time setup in Google Cloud Console**
+1. In your project, go to **APIs & Services > Library**, search for **Google People API**, and click **Enable**.
+2. Go to **Google Auth Platform > Data Access** (the OAuth consent screen's scopes), click **Add or remove scopes**, and add `https://www.googleapis.com/auth/contacts.readonly`. Save.
+3. No change is needed in Supabase.
+
+**Going live.** `contacts.readonly` is a **sensitive scope**. While the Google app is in *Testing*, your test users can grant it (they see a warning that Google has not verified the app). To open it to the public, Google requires an **app verification** (a privacy policy, a short explanation of why contacts are read, and sometimes a demo video). Until then, you can keep the Google option and rely on the contacts file for everyone else, or publish without verification and accept that users will see an "unverified app" warning and a limit of about 100 users.
+
+## Connecting Google to an existing account
+
+On **Sign-in & security**, someone who signed up with an email and password can press **Connect Google** to add Google to the same account (and **Disconnect** to remove it, as long as it is not their only way in). This uses Supabase's *manual linking*, which is **off by default**: turn on **Authentication > Sign In / Providers > Allow manual linking**. Until then the button says connecting another sign-in is not turned on yet.
+
 ## Troubleshooting
 
 | What you see | Cause and fix |
 | --- | --- |
+| "Connecting another sign-in is not turned on for this app yet" | Manual linking is off in Supabase. Turn on **Allow manual linking** (above). |
+| "Reading Google contacts isn't set up for this app yet", with a grey line ending `SERVICE_DISABLED` | The **Google People API** is not enabled in the Google Cloud project that owns your OAuth client. Open **APIs & Services > Library**, search "Google People API" (not Calendar), and click **Enable**; or follow the button on the error screen, which links straight to it. Wait a minute or two, then try again. The grey line also lists the permissions the sign-in token holds; if it includes `contacts.readonly`, the permission itself is fine and only the API switch is missing. |
+| "Google did not allow access to your contacts" after returning from Google | The permission was not granted, the **Google People API** is not enabled (step 1 above), or the contacts scope was not added (step 2). Check both, then try again and tick the contacts permission. |
+| The Google option on the import screen is greyed out | The account does not sign in with Google. Sign out and use **Continue with Google**, or use a contacts file. |
 | No Google button | Google is not enabled in Supabase yet (Part B), or the page needs a reload. Open the Google provider page and check it is switched on. |
 | Google says `redirect_uri_mismatch` | The **Authorized redirect URI** in Google does not exactly match `https://<project-ref>.supabase.co/auth/v1/callback`. Copy it from the Google provider page in Supabase. |
 | Google says "Access blocked" or "app not verified" | The app is in Testing and your account is not a test user. Add it under **Audience > Test users**, or publish the app (Part D). |

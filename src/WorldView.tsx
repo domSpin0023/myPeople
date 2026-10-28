@@ -19,7 +19,8 @@ interface Props {
   onOpen: (id: string) => void;
 }
 
-const bg = (p: Person) => `linear-gradient(135deg, ${HUES[p.hue].light}, ${HUES[p.hue].deep})`;
+const bg = (p: Person) =>
+  `${p.photo ? `url("${p.photo}") center / cover no-repeat, ` : ""}linear-gradient(135deg, ${HUES[p.hue].light}, ${HUES[p.hue].deep})`;
 const initial = (p: Person) => p.name.trim().charAt(0).toUpperCase() || "?";
 
 /** Puts React content on the map at a real coordinate, kept in place by MapLibre as you pan and zoom. */
@@ -57,7 +58,7 @@ function Collage({ members }: { members: Person[] }) {
     <span className={"collage n" + Math.min(members.length, 4)}>
       {shown.map((m) => (
         <span key={m.id} className="mini" style={{ background: bg(m) }}>
-          {initial(m)}
+          {!m.photo && initial(m)}
         </span>
       ))}
       {extra > 0 && <span className="mini more">+{extra}</span>}
@@ -68,7 +69,7 @@ function Collage({ members }: { members: Person[] }) {
 function Disc({ person, size, onOpen }: { person: Person; size: number; onOpen: (id: string) => void }) {
   return (
     <button className="disc" style={{ width: size, height: size, background: bg(person), fontSize: size * 0.42 }} aria-label={`${person.name}, open page`} onClick={() => onOpen(person.id)}>
-      <span>{initial(person)}</span>
+      <span>{!person.photo && initial(person)}</span>
     </button>
   );
 }

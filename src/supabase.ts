@@ -6,6 +6,15 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 /** True once the two values from .env.local are present. */
 export const isConfigured = Boolean(url && key);
 
+/**
+ * True if this page load is the browser coming back from Google (the address has a sign-in code or an error).
+ * Read before the client starts, because it removes those from the address as soon as it has used them.
+ */
+export const returnedFromOAuth = (() => {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("code") || params.has("error");
+})();
+
 // For whoever runs the app: this goes to the console, never onto the screen.
 if (!isConfigured) console.warn("myPeople: no database connection. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see docs/DATABASE.md).");
 

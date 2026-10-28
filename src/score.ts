@@ -26,7 +26,7 @@ export function involvement(items: Item[], now: number): Involvement {
   for (const it of items) {
     if (it.realizedAt === null) continue;
     const ageDays = Math.max(0, (now - it.realizedAt) / DAY_MS);
-    points += it.weight * Math.pow(0.5, ageDays / HALF_LIFE_DAYS);
+    points += Math.min(it.weight, 3) * Math.pow(0.5, ageDays / HALF_LIFE_DAYS);
     acts++;
     if (last === null || it.realizedAt > last) last = it.realizedAt;
   }

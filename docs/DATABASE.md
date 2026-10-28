@@ -29,7 +29,8 @@ Two things to know as the operator:
 - **Allow new users to sign up: ON.** Anyone can create their own account; their data is isolated from everyone else's.
 - **Confirm email: ON.** Users confirm their address before first sign-in. Under **Authentication > URL Configuration**, set the **Site URL** to the app's real address and add it (plus `http://localhost:5174` for local development) to **Redirect URLs**, so confirmation links come back to the app. The Site URL defaults to `http://localhost:3000`, which is not this app. The sign-up form asks for the app's own address, and Supabase honors it once it is on the Redirect URLs list.
 - **Email sending:** Supabase's built-in email is rate-limited and meant for testing. For real users, set up your own SMTP provider under **Authentication > Emails > SMTP Settings**.
-- **Protection:** keep the default rate limits, and consider enabling CAPTCHA or leaked-password protection under **Authentication** as you grow.
+- **Protection:** keep the default rate limits, and consider enabling CAPTCHA under **Authentication** as you grow. Turn on **leaked-password protection** (**Authentication > Sign In / Providers > Email > Prevent use of leaked passwords**, available on the Pro plan), which Supabase's security advisor recommends.
+- **Allow manual linking: ON** (**Authentication > Sign In / Providers**, under "Allow manual linking"). This is what lets someone press **Connect Google** on their account page to add Google to an existing account. If it is off, that button explains that connecting another sign-in is not turned on yet.
 
 ### 4. Connect the app (build-time settings)
 The app finds the database through two values that belong to the *app*, not to each user:
@@ -47,6 +48,15 @@ If these are missing, the app shows a plain "isn't available right now" message 
 ## Optional: "Continue with Google"
 
 Add a **Continue with Google** button for people who would rather not make a password. It needs a one-time setup in Google Cloud and in the Supabase dashboard, and the button only appears once Google is switched on in the project. Full steps: [GOOGLE-SIGN-IN.md](GOOGLE-SIGN-IN.md).
+
+## Accounts: profiles, and deleting an account
+
+Everyone gets an account area (the avatar at the top right): a **profile** (name, photo, color, birthday, where they live), **sign-in & security** (change email or password, connect or disconnect Google, sign out other devices or everywhere) and **your data** (download everything, or delete the account).
+
+- Profiles live in the `profiles` table, one row per account, private by the same Row Level Security as everything else. Photos are small thumbnails stored in the row (not in the sign-in token, which would bloat it).
+- **Deleting an account** calls the database function `delete_my_account()` (in `supabase/schema.sql`). It can only delete the caller's own account, and the account's profile, people and items are removed with it (`on delete cascade`). Signed-out visitors cannot run it. Supabase's security advisor lists it as a warning because it is a `SECURITY DEFINER` function that signed-in users can call; that is intentional. It was tested in a transaction that rolls back: it removed only the test account's data and left another account's untouched.
+- Changing an email address sends confirmation links, so the **Site URL** and **Redirect URLs** (above) must be set correctly.
+- Before opening the app to the public you still need a privacy policy and terms; the export and delete features are the technical half of "your data belongs to you".
 
 ## How saving works
 
