@@ -1,10 +1,27 @@
-# myChart
+# myPeople
+
+*(Working name.)* A place to backlog my acts of love: spending time with someone, getting gifts, planning events, and keeping track of the things I know about people and the ways I can serve them.
+
+This project started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1 (full history kept), a task timeline. The timeline is now one part of this app, used to map tasks to dates or spans of time.
+
+## Vision (draft)
+
+- **People are the main object.** Each person has their own space, with different kinds of lists related to them: gift lists, loves lists, event lists, and so on.
+- **Items come in a few types.** Some are reminders with no date at all (try to connect with someone, do some act of service). Some are "do this by" tasks. A few are spans of time.
+- **The timeline is a view, not the whole app.** Items that have a date can be mapped onto it. It will mostly be **Due by** dates, since these are not calendar events, but **Timescale** (start and end) stays.
+- **Keep it simple and warm.** A backlog to draw from, not a to-do list that nags.
+
+Still to be worked out together: the exact item types, what a person's page contains, how the timeline relates to the people view, and what notifications look like.
+
+---
+
+# The timeline (carried over from myChart v1)
 
 A very simple place to dump everything I need to do, then schedule it and keep track of it. It is a timeline (like GitHub Roadmap) combined with an issue board (like GitLab): tasks are rows on a zoomable calendar, and each opens into a full pullout panel.
 
-## Purpose
+## Purpose of the v1 timeline
 
-I take instructions from my supervisor to talk to people and learn about topics and machines. myChart gives those a home:
+I take instructions from my supervisor to talk to people and learn about topics and machines. myChart gave those a home:
 
 - **Capture fast.** Name a task and optionally give it a time: a **Timescale** (start and end) or a **Due by** (just an end).
 - **See it in time.** Every task is a row with a thin dotted colored line.

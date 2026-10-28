@@ -140,7 +140,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>myChart</h1>
+        <h1>myPeople</h1>
         <form
           className="add"
           onSubmit={(e) => {

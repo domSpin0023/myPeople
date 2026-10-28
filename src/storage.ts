@@ -3,8 +3,8 @@ import { STARTER_LABELS } from "./types";
 
 // All persistence goes through here so localStorage can be swapped for a
 // database later without touching the UI.
-const TASKS_KEY = "mychart.tasks.v1";
-const LABELS_KEY = "mychart.labels.v1";
+const TASKS_KEY = "mypeople.tasks.v1";
+const LABELS_KEY = "mypeople.labels.v1";
 
 const KINDS = ["talk", "topic", "machine", "other"];
 
