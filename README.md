@@ -6,6 +6,8 @@ It started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1, a 
 
 ## The idea
 
+> this view is specifically for realized works. it represents the reality (according to the app) of the magnitude of your actions in reference to each person.
+
 - **The home page is a map.** You are the bubble in the center. Everyone else is placed around you by how involved you have been with them: more involved means **closer, bigger, and a thicker line**. People you have neglected drift to the edge and shrink, so gaps are easy to see.
 - **People are the main object.** Click a bubble to open that person's page.
 - **A person's page has lists:** *Loves* (things they love, so you remember), *Gift ideas*, *Events* and *Ways to serve*.
