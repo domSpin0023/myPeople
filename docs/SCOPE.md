@@ -11,6 +11,7 @@ MyPeople stores and represents people in relation to the user. Fields that are c
   - **Perspective** is any data meant to be curated by another person in relation to one's core data.
 - **Several ways of representing relationships:** all relations, groups (family, friend groups, church, classes, others), and locations.
 - **AI agents that listen to the user's microphone input**, to reduce time spent on screen.
+- **Peer-accountability features**, such as screen-time management. For example, a user can send another user a notification request asking for more screen time.
 
 ## Restrictions / scope limitations (technical or ethical)
 
