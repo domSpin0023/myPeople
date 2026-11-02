@@ -75,3 +75,12 @@ The app could recognize and suggest things based on a person's likes, and later 
 - **Suggested kinds:** gift ideas, ways to serve, and events, drawn from likes (and, later, favorites, birthdays and location).
 - **Possible sponsored suggestions** for events and gifts. If this ever happens, any sponsored item must be **clearly labeled as sponsored**, never disguised as an ordinary suggestion, and easy to hide.
 - **Open questions:** where suggestions come from (rules, a model, partners), what data would leave the app to produce them, and how to keep it feeling like care rather than marketing.
+
+## Group calendars
+
+Groups could have a shared calendar, synced with Google Calendar or other calendar apps.
+
+- Members of a group get access to that group's calendar: see upcoming events, and (depending on role) add or edit them.
+- Two-way sync with external calendars (Google first, then others such as Outlook or Apple/iCal via CalDAV), so group events show up where people already look.
+- Pairs with birthdays and "Do this by" dates: group events could feed the home page nudges.
+- **Open questions:** who can edit (any member, or only admins), whether sync is per person or per group, which calendar providers to support beyond Google, and how to handle privacy when a member's own calendar is connected.
