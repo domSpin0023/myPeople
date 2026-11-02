@@ -1,8 +1,6 @@
 # myPeople
 
-*(Working name.)* A place to backlog my acts of love: spending time with someone, getting gifts, planning events, and keeping track of the things I know about people and the ways I can serve them.
-
-It started as a fork of [myChart](https://github.com/domSpin0023/myChart) v1, a task timeline. The app was restarted around people; the timeline code is gone from the working tree but lives in git history and in the myChart repo, ready to come back as a view.
+A place to backlog acts of love: spending time with someone, getting gifts, planning events, and keeping track of the things I know about people and the ways I can serve them.
 
 ## The idea
 
@@ -44,34 +42,3 @@ Light, bright and subtle: a soft pastel gradient backdrop, frosted-glass surface
 - **Supabase** (hosted Postgres) as **one shared database for all users** (`src/db.ts`, `supabase/schema.sql`). People sign up with an email and password, or with **Google** once it is enabled (see [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md)); every row is tied to its owner and **Row Level Security** means the database only ever returns an account its own data. Changes appear on screen immediately and are saved in order by a small queue (`src/sync.ts`) that keeps retrying, and never drops a change, if the network or session fails. One-time operator setup: [docs/DATABASE.md](docs/DATABASE.md).
 - **Vercel** for hosting (planned)
 
-## Run it
-
-```bash
-npm install
-npm run dev
-```
-
-To run it you need the app's database connected, a one-time step for whoever operates the app (not for users). Follow [docs/DATABASE.md](docs/DATABASE.md): create the Supabase project, run `supabase/schema.sql`, put the project URL and anon key in `.env.local` (copy `.env.example`), and restart the dev server. Until then, the app shows a plain "isn't available right now" message and logs a note about the missing settings to the browser console. Setup instructions are never shown inside the app.
-
-The dev server always runs on **http://localhost:5174** (pinned in `vite.config.ts`, so it can run beside myChart). Google and Supabase sign-in send people back to that exact address, so open the app at `localhost`, not `127.0.0.1`, and not on another port. If port 5174 is taken, the server stops with an error instead of quietly picking another port.
-
-## Documentation
-
-| Guide | What it covers |
-| --- | --- |
-| [docs/DATABASE.md](docs/DATABASE.md) | One-time setup of the shared Supabase database: the project, the tables and privacy rules, sign-in settings, and the two connection values. Start here. |
-| [docs/GOOGLE-SIGN-IN.md](docs/GOOGLE-SIGN-IN.md) | Optional "Continue with Google": the Google Cloud and Supabase steps, going live, and troubleshooting. |
-| [docs/LIKES-AND-CLOSENESS.md](docs/LIKES-AND-CLOSENESS.md) | How likes are recorded, and the exact metrics for likeness (importance) and closeness (involvement). |
-| [docs/IDEAS.md](docs/IDEAS.md) | The backlog: ideas being held for later (myPlaces, a super-powered Life360, "in town" nudges, role models). |
-| [supabase/schema.sql](supabase/schema.sql) | The database schema, with Row Level Security. |
-| [CHANGELOG.md](CHANGELOG.md) | What has changed, in order. |
-
-## Plan
-
-1. **Map and people (done):** the relationship map, person pages, the four lists, and realized-item scoring.
-1b. **World view (done):** a blank pastel earth with places and people that regroup by zoom level.
-2. **Making the map better:** drag to nudge, group or tint by relationship, hover details, many-people layouts.
-3. **Richer items:** notes on an item, dates (a **Due by** or a **Timescale**, like the myChart timeline), recurring reminders to connect.
-4. **Timeline view:** bring the timeline back as one view of every dated item across people.
-5. **Reminders with no date:** gentle nudges to reach out to someone who has drifted away.
-6. **Backend (done):** your data lives in Supabase. **Next:** hosting on Vercel, sync across open tabs and devices, and phone notifications.
