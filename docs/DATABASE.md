@@ -58,6 +58,10 @@ Everyone gets an account area (the avatar at the top right): a **profile** (name
 - Changing an email address sends confirmation links, so the **Site URL** and **Redirect URLs** (above) must be set correctly.
 - Before opening the app to the public you still need a privacy policy and terms; the export and delete features are the technical half of "your data belongs to you".
 
+## Core, perspective and linking
+
+Profiles are **core** (what someone says about themselves), people are **perspectives** (what you keep about someone else), and `core_links` lets a person share their core profile with the account that keeps them, only after they accept a code. Full design: [CORE-AND-PERSPECTIVE.md](CORE-AND-PERSPECTIVE.md). The new functions `accept_core_link()` and `my_core_viewers()` are `SECURITY DEFINER` and callable by signed-in users only, like `delete_my_account()`, so Supabase's advisor will list them as warnings too.
+
 ## How saving works
 
 - Every change is saved to the database a moment after it is made. The top bar shows **Saving…** and then **Saved**.

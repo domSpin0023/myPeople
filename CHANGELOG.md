@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added (core and perspective)
+- **Core profile** now holds pronouns, identity, loves and favorite places, as well as name, birthday, photo, color and where you live. Your loves moved from the hidden self entry onto your profile (copied by the migration).
+- **Perspective-only people** (no account) can hold every field: pronouns, identity and favorite places were added to a person's page next to what was already there.
+- **Linking:** on a person's page, "Link to their profile" gives a one-time code. When they enter it under Account, Sharing, their core profile becomes readable (read-only) on their page and your own side stays yours. Either of you can end the link; they can see who has access.
+- Database: new columns on `profiles` and `people`, a `core_links` table, `accept_core_link()` and `my_core_viewers()`, and a read policy on `profiles` for linked viewers. See `docs/CORE-AND-PERSPECTIVE.md`. **Not yet applied to the production project.**
+- Calendar integration is phase 2 and not started.
+
 ### Added
 - **World view**, a second way to see your people: a blank pastel map of the earth (MapLibre with OpenFreeMap tiles and a custom style) with no labels except the places you add. Switch between **Relationships** and **World** with the control at the top; browser back from a person returns to the view you came from.
 - **Where they live** on a person's page: search by address, city, state or country (OpenStreetMap Nominatim), pick a result, and optionally add a nickname. The result's nested place chain (country, state, city) and how exact it is are saved.

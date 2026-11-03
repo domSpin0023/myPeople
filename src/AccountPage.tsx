@@ -8,7 +8,7 @@ import { sync } from "./sync";
 import * as db from "./db";
 import { toThumbnail } from "./photo";
 import Face from "./Face";
-import { BirthdayField, PlaceEditor } from "./PersonPage";
+import { BirthdayField, FavoritePlaces, PlaceEditor } from "./PersonPage";
 import { signOutWithCheck } from "./AccountMenu";
 
 interface Props {
@@ -91,6 +91,16 @@ function ProfileCard({ account, profile, name, onChange }: Pick<Props, "account"
         <input value={profile.displayName} maxLength={80} placeholder={account.suggestedName || "Your name"} onChange={(e) => onChange({ displayName: e.target.value })} />
       </label>
 
+      <label className="field">
+        Pronouns
+        <input value={profile.pronouns} maxLength={40} placeholder="e.g. she/her, he/him, they/them" onChange={(e) => onChange({ pronouns: e.target.value })} />
+      </label>
+
+      <label className="field">
+        Identity
+        <textarea rows={2} value={profile.identity} maxLength={200} placeholder="How you describe yourself" onChange={(e) => onChange({ identity: e.target.value })} />
+      </label>
+
       <div className="field">
         Your color
         <div className="hues" role="group" aria-label="Color">
@@ -108,6 +118,88 @@ function ProfileCard({ account, profile, name, onChange }: Pick<Props, "account"
       </div>
 
       <BirthdayField value={profile.birthday} onChange={(birthday) => onChange({ birthday })} />
+    </section>
+  );
+}
+
+/** Core data is shared only with people who have a link to you, and only after you accept their code. */
+function SharingCard() {
+  const [code, setCode] = useState("");
+  const [viewers, setViewers] = useState<db.CoreViewer[] | null>(null);
+  const [note, setNote] = useState<Note | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = () => {
+    db.loadViewers().then(setViewers, (e: unknown) => {
+      setViewers([]);
+      setNote({ text: message(e, "Could not load who can see your profile."), bad: true });
+    });
+  };
+  useEffect(reload, []);
+
+  const accept = async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      await db.acceptLink(code);
+      setCode("");
+      setNote({ text: "Done. They can now see your profile.", bad: false });
+      reload();
+    } catch (e) {
+      setNote({ text: message(e, "That did not work. Try again."), bad: true });
+    }
+    setBusy(false);
+  };
+
+  const revoke = async (v: db.CoreViewer) => {
+    if (!window.confirm(`Stop ${v.name} from seeing your profile?`)) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      await db.deleteLink(v.linkId);
+      reload();
+    } catch (e) {
+      setNote({ text: message(e, "That did not work. Try again."), bad: true });
+    }
+    setBusy(false);
+  };
+
+  return (
+    <section id="acct-sharing" className="acct-card glass">
+      <header>
+        <h3>Sharing</h3>
+        <p>Your profile (name, pronouns, identity, loves, favorite places, where you live) is private until you let someone see it.</p>
+      </header>
+
+      <div className="acct-block">
+        <strong>Let someone see your profile</strong>
+        <p className="muted-note">Someone who keeps you on their map can give you a code. Enter it here to link their page for you to your profile. You can end it any time.</p>
+        <div className="add-row">
+          <input value={code} placeholder="Link code" aria-label="Link code" autoComplete="off" onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && accept()} />
+          <button className="pill-btn primary" disabled={busy || !code.trim()} onClick={accept}>
+            Accept
+          </button>
+        </div>
+        <NoteLine note={note} />
+      </div>
+
+      <div className="acct-block">
+        <strong>Who can see it</strong>
+        {viewers === null && <p className="muted-note">…</p>}
+        {viewers?.length === 0 && <p className="muted-note">No one.</p>}
+        {viewers?.map((v) => (
+          <div className="acct-row" key={v.linkId}>
+            <div>
+              <span>{v.name}</span>
+              <span className="muted-note">Since {new Date(v.since).toLocaleDateString()}</span>
+            </div>
+            <button className="pill-btn quiet" disabled={busy} onClick={() => revoke(v)}>
+              Stop sharing
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -383,6 +475,9 @@ export default function AccountPage({ account, profile, name, people, items, sec
 
       <ProfileCard account={account} profile={profile} name={name} onChange={onChange} />
       <PlaceEditor place={profile.place} onChange={(place) => onChange({ place })} title="Where you live" />
+      <FavoritePlaces places={profile.favoritePlaces} title="Your favorite places" onChange={(favoritePlaces) => onChange({ favoritePlaces })} />
+      <p className="muted-note">Your loves are on your own page: click the bubble at the center of your map.</p>
+      <SharingCard />
       <SecurityCard account={account} />
       <DataCard account={account} profile={profile} people={people} items={items} />
     </div>

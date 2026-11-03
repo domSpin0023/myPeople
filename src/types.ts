@@ -57,6 +57,26 @@ export interface PersonPlace {
   chain: PlaceNode[];
 }
 
+/** A place someone loves to be, with its own id so it can be edited in a list. */
+export type FavoritePlace = PersonPlace & { id: string };
+
+/** One of someone's own loves in their core profile. */
+export interface CoreLove {
+  id: string;
+  title: string;
+  weight: Weight;
+  createdAt: number;
+}
+
+/** A link to the person's own account. Pending until they accept the code; then their core profile is readable. */
+export interface PersonLink {
+  id: string;
+  /** Give this to them to accept. */
+  code: string;
+  /** Their own core profile, once they have accepted; null while pending. */
+  core: Profile | null;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -72,11 +92,22 @@ export interface Person {
   photo?: string | null;
   /** True for the one entry that is you: it holds your own lists and is never shown as a person. */
   isSelf?: boolean;
+  /** Core-type fields, kept here while the person has no account of their own (perspective-only). */
+  pronouns?: string;
+  identity?: string;
+  favoritePlaces?: FavoritePlace[];
+  /** Set once you have started a link to their own account; see PersonLink. */
+  link?: PersonLink | null;
 }
 
-/** How the signed-in person describes themselves. One per account. */
+/** Core: how a person describes themselves. One per account. */
 export interface Profile {
   displayName: string;
+  pronouns: string;
+  /** How they describe who they are, in their own words. */
+  identity: string;
+  loves: CoreLove[];
+  favoritePlaces: FavoritePlace[];
   /** A small thumbnail as a data URL. */
   photo: string | null;
   hue: HueKey;
@@ -84,7 +115,17 @@ export interface Profile {
   place: PersonPlace | null;
 }
 
-export const EMPTY_PROFILE: Profile = { displayName: "", photo: null, hue: "blue", birthday: null, place: null };
+export const EMPTY_PROFILE: Profile = {
+  displayName: "",
+  pronouns: "",
+  identity: "",
+  loves: [],
+  favoritePlaces: [],
+  photo: null,
+  hue: "blue",
+  birthday: null,
+  place: null,
+};
 
 export type Weight = 1 | 2 | 3 | 4;
 

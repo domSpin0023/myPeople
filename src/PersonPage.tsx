@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { HueKey, Item, ListMeta, Person, PersonPlace, Weight } from "./types";
+import type { FavoritePlace, HueKey, Item, ListMeta, Person, PersonPlace, Profile, Weight } from "./types";
 import { HUES, HUE_KEYS, LISTS, RELATIONSHIPS } from "./types";
 import { involvement } from "./score";
 import BlobView from "./BlobView";
-import { MONTH_NAMES, makeBirthday, parseBirthday } from "./birthday";
+import { MONTH_NAMES, formatBirthday, makeBirthday, parseBirthday } from "./birthday";
 import type { GeoResult } from "./geocode";
 import { PRECISION_LABEL, searchPlaces } from "./geocode";
 
@@ -20,6 +20,9 @@ interface Props {
   onAddItem: (list: ListMeta["key"], title: string) => void;
   onUpdateItem: (id: string, patch: Partial<Item>) => void;
   onDeleteItem: (id: string) => void;
+  /** Start or end a link to this person's own account (for people you keep, not for you). */
+  onLink?: () => Promise<void>;
+  onUnlink?: () => Promise<void>;
 }
 
 const fmt = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -403,9 +406,282 @@ export function PlaceEditor({
   );
 }
 
-export default function PersonPage({ person, items, isSelf, onAccount, onUpdate, onDelete, onBack, onAddItem, onUpdateItem, onDeleteItem }: Props) {
+const FIRES = ["small", "medium", "large", "favorite"];
+
+/** Pronouns and how someone describes who they are. Read-only when it comes from their own profile. */
+export function AboutCard({
+  pronouns,
+  identity,
+  readOnly,
+  title = "About",
+  onChange,
+}: {
+  pronouns: string;
+  identity: string;
+  readOnly?: boolean;
+  title?: string;
+  onChange?: (patch: { pronouns?: string; identity?: string }) => void;
+}) {
+  return (
+    <section className="place-card glass">
+      <header>
+        <h3>{title}</h3>
+        <p>{readOnly ? "In their own words, from their profile." : "Pronouns, and who they are, in whatever words fit."}</p>
+      </header>
+      {readOnly ? (
+        <div className="about-read">
+          <div>
+            <span className="field-title">Pronouns</span>
+            <p>{pronouns || <span className="faint">Not shared</span>}</p>
+          </div>
+          <div>
+            <span className="field-title">Identity</span>
+            <p>{identity || <span className="faint">Not shared</span>}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <label className="field">
+            Pronouns
+            <input value={pronouns} maxLength={40} placeholder="e.g. she/her, he/him, they/them" onChange={(e) => onChange?.({ pronouns: e.target.value })} />
+          </label>
+          <label className="field">
+            Identity
+            <textarea rows={2} value={identity} maxLength={200} placeholder="How they describe themselves" onChange={(e) => onChange?.({ identity: e.target.value })} />
+          </label>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Places someone loves to be, each a real place. Read-only when it comes from their own profile. */
+export function FavoritePlaces({
+  places,
+  readOnly,
+  title = "Favorite places",
+  onChange,
+}: {
+  places: FavoritePlace[];
+  readOnly?: boolean;
+  title?: string;
+  onChange?: (places: FavoritePlace[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [nick, setNick] = useState("");
+  const [results, setResults] = useState<GeoResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      setResults(await searchPlaces(query));
+    } catch {
+      setError("Could not reach the place search. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = (r: GeoResult) => {
+    onChange?.([...places, { ...r, nickname: nick.trim(), id: crypto.randomUUID() }]);
+    setResults(null);
+    setQuery("");
+    setNick("");
+  };
+
+  return (
+    <section className="place-card glass">
+      <header>
+        <h3>{title}</h3>
+        <p>{readOnly ? "Places they love, from their profile." : "Places that matter to them. Each needs a real place; a nickname is optional."}</p>
+      </header>
+      {places.length === 0 && <p className="list-empty">{readOnly ? "None shared." : "Nothing here yet."}</p>}
+      <ul className="items">
+        {places.map((pl) => (
+          <li key={pl.id} className="item">
+            <div className="item-main">
+              <span className="item-title">{pl.nickname || pl.name}</span>
+              {pl.nickname && <span className="muted-note">{pl.name}</span>}
+            </div>
+            <span className="chip neutral">{PRECISION_LABEL[pl.precision]}</span>
+            {!readOnly && (
+              <button className="x" aria-label={`Remove ${pl.nickname || pl.name}`} onClick={() => onChange?.(places.filter((x) => x.id !== pl.id))}>
+                ×
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {!readOnly && (
+        <div className="place-search">
+          <label className="field">
+            Nickname (optional)
+            <input value={nick} placeholder="e.g. The lake house" onChange={(e) => setNick(e.target.value)} />
+          </label>
+          <div className="add-row">
+            <input
+              value={query}
+              placeholder="Search an address, city, state…"
+              aria-label="Search for a favorite place"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && search()}
+            />
+            <button className="pill-btn primary" disabled={!query.trim() || busy} onClick={search}>
+              {busy ? "Searching…" : "Find"}
+            </button>
+          </div>
+          {error && <p className="field-error">{error}</p>}
+          {results && results.length === 0 && <p className="list-empty">No matches. Try adding a city or state.</p>}
+          {results && results.length > 0 && (
+            <ul className="results">
+              {results.map((r, i) => (
+                <li key={i}>
+                  <button onClick={() => add(r)}>
+                    <span>{r.name}</span>
+                    <span className="chip neutral">{PRECISION_LABEL[r.precision]}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Someone's loves as they wrote them in their own profile: you can read them, not change them. */
+function CoreLoves({ core }: { core: Profile }) {
+  const ranked = [...core.loves].sort((a, b) => b.weight - a.weight || b.createdAt - a.createdAt);
+  return (
+    <section className="list-card glass">
+      <header className="list-head">
+        <div>
+          <h3>Loves {ranked.length > 0 && <span className="count">{ranked.length}</span>}</h3>
+          <p>What they say they love, from their profile</p>
+        </div>
+      </header>
+      {ranked.length === 0 && <p className="list-empty">Nothing shared yet.</p>}
+      <ul className="items">
+        {ranked.map((l) => (
+          <li key={l.id} className={"item" + (l.weight === 4 ? " fav" : "")}>
+            <div className="item-main">
+              <span className="item-title">{l.title}</span>
+            </div>
+            <span className="weight" title={`Importance: ${FIRES[l.weight - 1]}`}>
+              {l.weight === 4 ? <span className="fav-mark">★ Favorite</span> : l.weight === 1 ? <span className="faint">🔥</span> : "🔥".repeat(l.weight - 1)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Where someone lives, as shown from their own profile. */
+function PlaceView({ place, title }: { place: PersonPlace | null | undefined; title: string }) {
+  return (
+    <section className="place-card glass">
+      <header>
+        <h3>{title}</h3>
+        <p>From their profile.</p>
+      </header>
+      {place ? (
+        <div className="place-name">
+          <strong>{place.nickname || place.name}</strong>
+          <span className="chip neutral">{PRECISION_LABEL[place.precision]}</span>
+        </div>
+      ) : (
+        <p className="list-empty">Not shared.</p>
+      )}
+    </section>
+  );
+}
+
+/** Linking a person you keep to their own account, so their core profile is theirs to write and yours to read. */
+function LinkCard({ person, onLink, onUnlink }: { person: Person; onLink?: () => Promise<void>; onUnlink?: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const link = person.link;
+
+  const run = async (fn?: () => Promise<void>) => {
+    if (!fn) return;
+    setBusy(true);
+    setError("");
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "That did not work. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link!.code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // the code is on screen to copy by hand
+    }
+  };
+
+  return (
+    <section className="place-card glass">
+      <header>
+        <h3>Their own profile</h3>
+        <p>
+          {!link
+            ? `${person.name || "They"} have no account linked, so you keep everything about them yourself. If they use myPeople, link them: they write their own profile and you read it.`
+            : link.core
+              ? "Linked. What they say about themselves comes from their own profile and is read-only here. Your side (notes, gift ideas, events, ways to serve) stays yours."
+              : "Waiting for them. Give them this code; they enter it under Account, Sharing. It works once and expires in 14 days."}
+        </p>
+      </header>
+      {link && !link.core && (
+        <div className="add-row">
+          <input readOnly value={link.code} aria-label="Link code" onFocus={(e) => e.currentTarget.select()} />
+          <button className="pill-btn" onClick={copy}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      )}
+      <div className="place-actions">
+        {!link ? (
+          <button className="pill-btn primary" disabled={busy} onClick={() => run(onLink)}>
+            Link to their profile
+          </button>
+        ) : (
+          <button
+            className="pill-btn quiet"
+            disabled={busy}
+            onClick={() => {
+              const msg = link.core
+                ? "Unlink? You will stop seeing their profile and go back to the details you had saved yourself."
+                : "Cancel this link? The code will stop working.";
+              if (window.confirm(msg)) void run(onUnlink);
+            }}
+          >
+            {link.core ? "Unlink" : "Cancel link"}
+          </button>
+        )}
+      </div>
+      {error && <p className="field-error">{error}</p>}
+    </section>
+  );
+}
+
+export default function PersonPage({ person, items, isSelf, onAccount, onUpdate, onDelete, onBack, onAddItem, onUpdateItem, onDeleteItem, onLink, onUnlink }: Props) {
   const stat = involvement(items, Date.now());
   const hue = HUES[person.hue];
+  // Linked: their core details come from their own profile and are read-only here.
+  const core = !isSelf ? (person.link?.core ?? null) : null;
+  const photo = core ? core.photo : person.photo;
+  const shownName = core?.displayName.trim() || person.name;
 
   return (
     <div className="page">
@@ -432,9 +708,9 @@ export default function PersonPage({ person, items, isSelf, onAccount, onUpdate,
       <section className="hero glass">
         <div
           className="avatar"
-          style={{ background: `${person.photo ? `url("${person.photo}") center / cover no-repeat, ` : ""}linear-gradient(135deg, ${hue.light}, ${hue.deep})` }}
+          style={{ background: `${photo ? `url("${photo}") center / cover no-repeat, ` : ""}linear-gradient(135deg, ${hue.light}, ${hue.deep})` }}
         >
-          <span>{!person.photo && (person.name.trim().charAt(0).toUpperCase() || "?")}</span>
+          <span>{!photo && (shownName.trim().charAt(0).toUpperCase() || "?")}</span>
         </div>
         <div className="hero-main">
           <input
@@ -444,6 +720,9 @@ export default function PersonPage({ person, items, isSelf, onAccount, onUpdate,
             onChange={(e) => onUpdate({ name: e.target.value })}
             onBlur={() => !person.name.trim() && onUpdate({ name: "Unnamed" })}
           />
+          {core && core.displayName.trim() && core.displayName.trim() !== person.name.trim() && (
+            <span className="muted-note">Goes by {core.displayName.trim()} on their profile</span>
+          )}
           <div className="hero-row">
             {isSelf ? (
               <span className="chip neutral">You</span>
@@ -468,8 +747,12 @@ export default function PersonPage({ person, items, isSelf, onAccount, onUpdate,
             </div>
           </div>
           <div className="hero-row">
-            <BirthdayField value={person.birthday ?? null} onChange={(birthday) => onUpdate({ birthday })} />
-            {person.photo && (
+            {core ? (
+              <span className="muted-note">{core.birthday ? `Birthday ${formatBirthday(core.birthday)}` : "No birthday shared"}</span>
+            ) : (
+              <BirthdayField value={person.birthday ?? null} onChange={(birthday) => onUpdate({ birthday })} />
+            )}
+            {!core && person.photo && (
               <button className="pill-btn quiet" onClick={() => onUpdate({ photo: null })}>
                 Remove photo
               </button>
@@ -491,8 +774,17 @@ export default function PersonPage({ person, items, isSelf, onAccount, onUpdate,
         )}
       </section>
 
+      <AboutCard
+        pronouns={core ? core.pronouns : (person.pronouns ?? "")}
+        identity={core ? core.identity : (person.identity ?? "")}
+        readOnly={!!core}
+        title={isSelf ? "About you" : undefined}
+        onChange={(patch) => onUpdate(patch)}
+      />
+
       <div className="lists">
-        {LISTS.map((meta) => (
+        {core && <CoreLoves core={core} />}
+        {LISTS.filter((meta) => !(core && meta.key === "loves")).map((meta) => (
           <ListCard
             key={meta.key}
             meta={meta}
@@ -505,7 +797,20 @@ export default function PersonPage({ person, items, isSelf, onAccount, onUpdate,
         ))}
       </div>
 
-      <PlaceEditor place={person.place} title={isSelf ? "Where you live" : undefined} onChange={(place) => onUpdate({ place })} />
+      {core ? (
+        <PlaceView place={core.place} title="Where they live" />
+      ) : (
+        <PlaceEditor place={person.place} title={isSelf ? "Where you live" : undefined} onChange={(place) => onUpdate({ place })} />
+      )}
+
+      <FavoritePlaces
+        places={core ? core.favoritePlaces : (person.favoritePlaces ?? [])}
+        readOnly={!!core}
+        title={isSelf ? "Your favorite places" : undefined}
+        onChange={(favoritePlaces) => onUpdate({ favoritePlaces })}
+      />
+
+      {!isSelf && <LinkCard person={person} onLink={onLink} onUnlink={onUnlink} />}
 
       {!isSelf && (
       <section className="notes glass">

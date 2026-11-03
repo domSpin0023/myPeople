@@ -84,3 +84,23 @@ Groups could have a shared calendar, synced with Google Calendar or other calend
 - Two-way sync with external calendars (Google first, then others such as Outlook or Apple/iCal via CalDAV), so group events show up where people already look.
 - Pairs with birthdays and "Do this by" dates: group events could feed the home page nudges.
 - **Open questions:** who can edit (any member, or only admins), whether sync is per person or per group, which calendar providers to support beyond Google, and how to handle privacy when a member's own calendar is connected.
+
+## Connector candidates
+
+Part of the scope idea that other apps do the work and myPeople is the beacon (see [SCOPE.md](SCOPE.md)). Access, cost and terms vary by provider and change often, so check each one before building.
+
+- **Interests (feed Loves and gift ideas):** Spotify, Apple Music, Last.fm, Letterboxd, StoryGraph, Pinterest, Are.na, Steam, Strava, YouTube.
+- **Wishes (feed Gift ideas):** Amazon Wishlist, Etsy favorites, Giftful, Elfster. Few have public APIs, so link sharing or import is more likely than live sync.
+- **Places (feed Favorite places and "in town" nudges):** Google Maps saved lists, Foursquare/Swarm, Yelp, AllTrails. Mostly import.
+- **Dates:** Google Calendar and Outlook (phase 2), Apple Calendar via CalDAV, Google and Apple Contacts for birthdays and addresses.
+- **Wellness:** Apple Health (needs a phone app), Fitbit, Oura, Whoop, Garmin, Headspace, Calm, Daylio. Terra or Validic could give one connection to many, for a fee.
+- **Serving and community (feed Ways to serve):** Planning Center and other church or group tools.
+- **Notes:** Notion, Obsidian, Apple Notes. Import is likely the best available.
+
+**Costs to expect:** most of these APIs are free to call, but some need an app review (Google verification for sensitive scopes, Pinterest approval), a partner agreement, or an aggregator fee. Traffic grows with users, connectors and sync frequency, so prefer webhooks over polling. You also take on privacy obligations for what you store, and some providers forbid using their data for ads or model training.
+
+**Open questions:**
+- Which one or two connectors prove the common interface first? Calendar is already planned; Spotify or Pinterest would be the first interests connector.
+- Do connectors only read into myPeople, or can other apps also read a person's core data out (with their consent)?
+- How are health data and other sensitive sources kept out of suggestions and anything sponsored?
+- Do connectors ever pay for access, or is reach the goal? (See [MONETIZATION-TOPICS.md](MONETIZATION-TOPICS.md).)

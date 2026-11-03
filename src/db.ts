@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { HueKey, Item, ListKey, Person, PersonPlace, Profile, Weight } from "./types";
+import type { CoreLove, FavoritePlace, HueKey, Item, ListKey, Person, PersonLink, PersonPlace, Profile, Weight } from "./types";
 import { EMPTY_PROFILE } from "./types";
 
 // All persistence goes through here. The app keeps its working copy in React state; these functions
@@ -15,7 +15,17 @@ interface PersonRow {
   birthday: string | null;
   photo: string | null;
   is_self: boolean;
+  pronouns: string;
+  identity: string;
+  favorite_places: FavoritePlace[];
   created_at: string;
+}
+
+interface LinkRow {
+  id: string;
+  person_id: string;
+  code: string;
+  target_id: string | null;
 }
 
 interface ItemRow {
@@ -37,12 +47,19 @@ const fail = (message: string): never => {
   throw new Error(message);
 };
 
+/** The signed-in account's id. */
+async function userId(): Promise<string> {
+  const { data } = await client().auth.getSession();
+  return data.session?.user.id ?? fail("Not signed in.");
+}
+
 export async function loadAll(): Promise<{ people: Person[]; items: Item[]; profile: Profile }> {
   const db = client();
-  const [p, i, profile] = await Promise.all([
+  const [p, i, profile, l] = await Promise.all([
     db.from("people").select("*").order("created_at", { ascending: true }),
     db.from("items").select("*").order("created_at", { ascending: true }),
     loadProfile(),
+    loadLinks(),
   ]);
   if (p.error) fail(p.error.message);
   if (i.error) fail(i.error.message);
@@ -57,6 +74,10 @@ export async function loadAll(): Promise<{ people: Person[]; items: Item[]; prof
     birthday: r.birthday ?? null,
     photo: r.photo ?? null,
     isSelf: !!r.is_self,
+    pronouns: r.pronouns ?? "",
+    identity: r.identity ?? "",
+    favoritePlaces: r.favorite_places ?? [],
+    link: l.get(r.id) ?? null,
     createdAt: Date.parse(r.created_at),
   }));
   const items: Item[] = ((i.data ?? []) as ItemRow[]).map((r) => ({
@@ -71,32 +92,111 @@ export async function loadAll(): Promise<{ people: Person[]; items: Item[]; prof
   return { people, items, profile };
 }
 
+/** Your links to people's own accounts, keyed by the person; accepted ones carry that person's core profile. */
+async function loadLinks(): Promise<Map<string, PersonLink>> {
+  const db = client();
+  const me = await userId();
+  const { data, error } = await db.from("core_links").select("id, person_id, code, target_id").eq("viewer_id", me);
+  if (error) fail(error.message);
+  const rows = (data ?? []) as LinkRow[];
+  const targets = [...new Set(rows.map((r) => r.target_id).filter((t): t is string => !!t))];
+  const cores = new Map<string, Profile>();
+  if (targets.length) {
+    const res = await db.from("profiles").select("*").in("user_id", targets);
+    if (res.error) fail(res.error.message);
+    for (const r of (res.data ?? []) as (ProfileRow & { user_id: string })[]) cores.set(r.user_id, fromProfileRow(r));
+  }
+  return new Map(
+    rows.map((r) => [r.person_id, { id: r.id, code: r.code, core: r.target_id ? (cores.get(r.target_id) ?? { ...EMPTY_PROFILE }) : null }]),
+  );
+}
+
 interface ProfileRow {
   display_name: string;
+  pronouns: string;
+  identity: string;
+  loves: CoreLove[];
+  favorite_places: FavoritePlace[];
   photo: string | null;
   hue: string;
   birthday: string | null;
   place: PersonPlace | null;
 }
 
-/** The signed-in person's own profile; blank if they have not filled it in yet. */
+const fromProfileRow = (r: ProfileRow): Profile => ({
+  displayName: r.display_name,
+  pronouns: r.pronouns ?? "",
+  identity: r.identity ?? "",
+  loves: r.loves ?? [],
+  favoritePlaces: r.favorite_places ?? [],
+  photo: r.photo ?? null,
+  hue: r.hue as HueKey,
+  birthday: r.birthday ?? null,
+  place: r.place ?? null,
+});
+
+/** The signed-in person's own core profile; blank if they have not filled it in yet. */
 export async function loadProfile(): Promise<Profile> {
-  const { data, error } = await client().from("profiles").select("*").maybeSingle();
+  // Linked viewers can read other accounts' profiles too, so ask for your own by id.
+  const { data, error } = await client().from("profiles").select("*").eq("user_id", await userId()).maybeSingle();
   if (error) fail(error.message);
-  const r = data as ProfileRow | null;
-  if (!r) return { ...EMPTY_PROFILE };
-  return { displayName: r.display_name, photo: r.photo ?? null, hue: r.hue as HueKey, birthday: r.birthday ?? null, place: r.place ?? null };
+  return data ? fromProfileRow(data as ProfileRow) : { ...EMPTY_PROFILE };
 }
 
 export async function upsertProfile(p: Profile): Promise<void> {
-  const db = client();
-  const { data } = await db.auth.getSession(); // the row is keyed by the account, so name it explicitly
-  const userId = data.session?.user.id;
-  if (!userId) fail("Not signed in.");
-  const { error } = await db
+  const { error } = await client()
     .from("profiles")
-    .upsert({ user_id: userId, display_name: p.displayName, photo: p.photo, hue: p.hue, birthday: p.birthday, place: p.place, updated_at: new Date().toISOString() });
+    .upsert({
+      user_id: await userId(), // the row is keyed by the account, so name it explicitly
+      display_name: p.displayName,
+      pronouns: p.pronouns,
+      identity: p.identity,
+      loves: p.loves,
+      favorite_places: p.favoritePlaces,
+      photo: p.photo,
+      hue: p.hue,
+      birthday: p.birthday,
+      place: p.place,
+      updated_at: new Date().toISOString(),
+    });
   if (error) fail(error.message);
+}
+
+/** Starts a link for one of your people and returns it (pending until they enter the code). */
+export async function createLink(personId: string): Promise<PersonLink> {
+  const { data, error } = await client().from("core_links").insert({ person_id: personId }).select("id, code").single();
+  if (error) fail(error.message);
+  const r = data as { id: string; code: string };
+  return { id: r.id, code: r.code, core: null };
+}
+
+/** Ends a link; either side may do this. */
+export async function deleteLink(id: string): Promise<void> {
+  const { error } = await client().from("core_links").delete().eq("id", id);
+  if (error) fail(error.message);
+}
+
+/** Enter a code someone gave you, letting them see your core profile. */
+export async function acceptLink(code: string): Promise<void> {
+  const { error } = await client().rpc("accept_core_link", { p_code: code });
+  if (error) fail(error.message);
+}
+
+export interface CoreViewer {
+  linkId: string;
+  name: string;
+  since: number;
+}
+
+/** Everyone who can currently see your core profile. */
+export async function loadViewers(): Promise<CoreViewer[]> {
+  const { data, error } = await client().rpc("my_core_viewers");
+  if (error) fail(error.message);
+  return ((data ?? []) as { link_id: string; viewer_name: string; accepted_at: string }[]).map((r) => ({
+    linkId: r.link_id,
+    name: r.viewer_name,
+    since: Date.parse(r.accepted_at),
+  }));
 }
 
 /** Permanently deletes the signed-in account and everything in it. */
@@ -118,6 +218,9 @@ export async function upsertPerson(p: Person): Promise<void> {
       birthday: p.birthday ?? null,
       photo: p.photo ?? null,
       is_self: !!p.isSelf,
+      pronouns: p.pronouns ?? "",
+      identity: p.identity ?? "",
+      favorite_places: p.favoritePlaces ?? [],
       created_at: new Date(p.createdAt).toISOString(),
       updated_at: new Date().toISOString(),
     });

@@ -448,3 +448,9 @@ textarea { width: 100%; resize: vertical; }
 .me-node:hover circle:nth-of-type(2), .me-node:focus-visible circle:nth-of-type(2) { filter: brightness(1.06); }
 .me-node:focus-visible { outline: none; }
 .me-node:focus-visible circle:last-of-type { stroke: #fff; stroke-opacity: 1; stroke-width: 3; }
+
+/* Core and perspective: read-only profile details, and the "not shared" marker */
+.about-read { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.about-read p { margin: 2px 0 0; }
+.about-read .field-title { font-size: 12px; color: var(--muted); }
+.faint { opacity: 0.5; }

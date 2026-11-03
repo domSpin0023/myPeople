@@ -238,6 +238,17 @@ export default function App({
     commitPeople(peopleRef.current.map((p) => (p.id === id ? next : p)));
     saveP(next);
   };
+  /** Starts a link to this person's own account; the code to give them appears on their page. */
+  const linkPerson = async (id: string) => {
+    const link = await db.createLink(id);
+    commitPeople(peopleRef.current.map((p) => (p.id === id ? { ...p, link } : p)));
+  };
+  const unlinkPerson = async (id: string) => {
+    const cur = peopleRef.current.find((p) => p.id === id);
+    if (!cur?.link) return;
+    await db.deleteLink(cur.link.id);
+    commitPeople(peopleRef.current.map((p) => (p.id === id ? { ...p, link: null } : p)));
+  };
   const deletePerson = (id: string) => {
     commitPeople(peopleRef.current.filter((p) => p.id !== id));
     commitItems(itemsRef.current.filter((i) => i.personId !== id));
@@ -283,9 +294,37 @@ export default function App({
     photo: profile.photo,
     birthday: profile.birthday,
     place: profile.place,
+    pronouns: profile.pronouns,
+    identity: profile.identity,
+    favoritePlaces: profile.favoritePlaces,
+  };
+  // Your loves are core data kept on your profile; the other three lists stay on your own page entry.
+  // Loves are shown through the same list as everything else, so each one is presented as an item here.
+  const meItems = useMemo<Item[]>(() => {
+    if (!selfPerson) return [];
+    const loves: Item[] = profile.loves.map((l) => ({ id: l.id, personId: selfPerson.id, list: "loves", title: l.title, weight: l.weight, realizedAt: null, createdAt: l.createdAt }));
+    return [...items.filter((i) => i.personId === selfPerson.id && i.list !== "loves"), ...loves];
+  }, [items, profile.loves, selfPerson]);
+  const addMeItem = (list: ListKey, title: string) => {
+    if (!selfPerson) return;
+    if (list !== "loves") return addItem(selfPerson.id, list, title);
+    updateProfile({ loves: [...profileRef.current.loves, { id: crypto.randomUUID(), title, weight: 1, createdAt: Date.now() }] });
+  };
+  const updateMeItem = (id: string, patch: Partial<Item>) => {
+    if (!profileRef.current.loves.some((l) => l.id === id)) return updateItem(id, patch);
+    updateProfile({
+      loves: profileRef.current.loves.map((l) => (l.id === id ? { ...l, title: patch.title ?? l.title, weight: patch.weight ?? l.weight } : l)),
+    });
+  };
+  const deleteMeItem = (id: string) => {
+    if (!profileRef.current.loves.some((l) => l.id === id)) return deleteItem(id);
+    updateProfile({ loves: profileRef.current.loves.filter((l) => l.id !== id) });
   };
   const updateMe = (patch: Partial<Person>) => {
     const p: Partial<Profile> = {};
+    if (patch.pronouns !== undefined) p.pronouns = patch.pronouns;
+    if (patch.identity !== undefined) p.identity = patch.identity;
+    if (patch.favoritePlaces !== undefined) p.favoritePlaces = patch.favoritePlaces;
     if (patch.name !== undefined) p.displayName = patch.name;
     if (patch.hue !== undefined) p.hue = patch.hue;
     if (patch.photo !== undefined) p.photo = patch.photo;
@@ -345,14 +384,14 @@ export default function App({
               key="me"
               person={mePage}
               isSelf
-              items={items.filter((i) => i.personId === mePage.id)}
+              items={meItems}
               onUpdate={updateMe}
               onDelete={() => undefined}
               onAccount={() => openAccount("profile")}
               onBack={back}
-              onAddItem={(list, title) => addItem(mePage.id, list, title)}
-              onUpdateItem={updateItem}
-              onDeleteItem={deleteItem}
+              onAddItem={addMeItem}
+              onUpdateItem={updateMeItem}
+              onDeleteItem={deleteMeItem}
             />
           ) : null
         ) : person ? (
@@ -366,6 +405,8 @@ export default function App({
             onAddItem={(list, title) => addItem(person.id, list, title)}
             onUpdateItem={updateItem}
             onDeleteItem={deleteItem}
+            onLink={() => linkPerson(person.id)}
+            onUnlink={() => unlinkPerson(person.id)}
           />
         ) : view === "world" ? (
           <Suspense fallback={<div className="world-loading">Loading the map…</div>}>
