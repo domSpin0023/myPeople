@@ -62,6 +62,11 @@ Everyone gets an account area (the avatar at the top right): a **profile** (name
 
 Profiles are **core** (what someone says about themselves), people are **perspectives** (what you keep about someone else), and `core_links` lets a person share their core profile with the account that keeps them, only after they accept a code. Full design: [CORE-AND-PERSPECTIVE.md](CORE-AND-PERSPECTIVE.md). The new functions `accept_core_link()` and `my_core_viewers()` are `SECURITY DEFINER` and callable by signed-in users only, like `delete_my_account()`, so Supabase's advisor will list them as warnings too.
 
+## Migrations and fake data
+
+- `supabase/migrations/` holds each change as its own file, in order (the first four production migrations predate this folder and live only in `schema.sql`). `20261103000000_core_and_perspective.sql` adds core and perspective; apply it before deploying code that uses it.
+- `supabase/seed.sql` adds three fake people (with lists, pronouns, a favorite place) to an account you name. Run it by hand, never as part of setup.
+
 ## How saving works
 
 - Every change is saved to the database a moment after it is made. The top bar shows **Saving…** and then **Saved**.
